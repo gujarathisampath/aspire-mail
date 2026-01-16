@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  aspire-mail:
+    container_name: aspire-mail
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "${PORT}:${PORT}"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
