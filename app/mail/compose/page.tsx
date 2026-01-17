@@ -235,7 +235,7 @@ const ComposePage = () => {
             </h1>
           </div>
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={handleSaveDraft}
             disabled={saveDraftMutation.isPending}

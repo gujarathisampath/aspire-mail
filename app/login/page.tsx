@@ -19,6 +19,7 @@ import { useState } from "react";
 import { EyeIcon, EyeOffIcon, Loader2Icon } from "lucide-react";
 import { loginAction } from "@/lib/actions/auth";
 import { useMutation } from "@tanstack/react-query";
+import Link from "next/link";
 
 const LoginPage = () => {
   const router = useRouter();
@@ -60,22 +61,28 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Sign In</CardTitle>
-          <CardDescription>
-            Enter your email credentials to access your mailbox
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
+    <div className="flex items-center justify-center min-h-screen p-2">
+      <div className="flex flex-1 flex-col justify-center px-4 py-10 lg:px-6">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <h3 className="text-start text-5xl text-foreground dark:text-foreground">
+            Welcome
+          </h3>
+          <p className="text-start text-md text-muted-foreground dark:text-muted-foreground">
+            Access your account and continue your journey with us
+          </p>
+          <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
+            <div>
+              <Label
+                htmlFor="email"
+                className="text-sm font-medium text-foreground dark:text-foreground"
+              >
+                Email
+              </Label>
               <Input
-                id="email"
                 type="email"
-                placeholder="name@example.com"
+                id="email"
+                placeholder="name@aspiredev.in"
+                className="mt-2"
                 {...register("email")}
               />
               {errors.email && (
@@ -84,22 +91,26 @@ const LoginPage = () => {
                 </p>
               )}
             </div>
-
             <div className="grid gap-2">
-              <Label htmlFor="password">Password</Label>
+              <Label
+                htmlFor="password"
+                className="text-sm font-medium text-foreground dark:text-foreground"
+              >
+                Password
+              </Label>
               <div className="relative">
                 <Input
-                  id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
-                  className="pr-10"
+                  id="password"
+                  placeholder="**************"
+                  className="mt-2"
                   {...register("password")}
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                  className="absolute right-0 top-1 h-full px-3 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
@@ -115,30 +126,32 @@ const LoginPage = () => {
                 </p>
               )}
             </div>
-
-            {mutation.isError && (
-              <p className="text-sm text-destructive text-center">
-                {mutation.error.message}
-              </p>
-            )}
-
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={mutation.isPending}
-            >
-              {mutation.isPending ? (
-                <>
-                  <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                "Sign In"
-              )}
+            <Button type="submit" className="mt-4 w-full py-2 font-medium" size={"lg"} disabled={mutation.isPending}>
+              {mutation.isPending ? <Loader2Icon className="h-4 w-4 animate-spin" /> : null} Sign In
             </Button>
           </form>
-        </CardContent>
-      </Card>
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+             <span>
+                {process.env.NEXT_PUBLIC_APP_NAME}
+             </span>
+             <span className="text-muted-foreground px-2">
+              •
+             </span>
+             {process.env.NEXT_PUBLIC_SUPPORT_URL && (
+              <Link href={process.env.NEXT_PUBLIC_SUPPORT_URL} className="font-medium text-primary hover:underline">
+                Get Support
+              </Link>
+             )}
+          </p>
+        </div>
+      </div>
+      <div
+        className="hidden w-1/2 self-stretch bg-cover bg-center lg:block rounded-4xl"
+        style={{
+          backgroundImage:
+            "url('https://images.unsplash.com/photo-1642615835477-d303d7dc9ee9?w=2160&q=80')",
+        }}
+      />
     </div>
   );
 };

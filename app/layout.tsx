@@ -5,6 +5,7 @@ import QueryProvider from "@/providers/query-provider";
 import { Toaster } from "@/components/ui/toaster";
 
 import { APP_CONFIG } from "@/lib/config";
+import { ThemeProvider } from "next-themes";
 
 const roboto = Roboto({
   subsets: ["latin"],
@@ -33,14 +34,21 @@ const RootLayout = ({
   children: React.ReactNode;
 }>) => {
   return (
-    <html lang="en" className={roboto.variable}>
+    <html lang="en" className={roboto.variable} suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <QueryProvider>
-          {children}
-          <Toaster />
-        </QueryProvider>
+        <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+          <QueryProvider>
+            {children}
+            <Toaster />
+          </QueryProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

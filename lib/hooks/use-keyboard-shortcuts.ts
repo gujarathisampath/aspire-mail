@@ -2,10 +2,16 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 
 export const useKeyboardShortcuts = () => {
   const router = useRouter();
-
+  const queryClient = useQueryClient();
+  const handleRefresh = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["mails"] });
+    setTimeout(() => {
+    }, 1000);
+  };
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger if user is typing in an input/textarea
@@ -18,6 +24,10 @@ export const useKeyboardShortcuts = () => {
       }
 
       switch (e.key.toLowerCase()) {
+        case "r":
+          e.preventDefault();
+          router.refresh();
+          break;
         case "c":
           e.preventDefault();
           router.push("/mail/compose");
@@ -28,7 +38,7 @@ export const useKeyboardShortcuts = () => {
           break;
         case "s":
           e.preventDefault();
-          router.push("/mail/starred");
+          router.push("/mail/sent");
           break;
         case "d":
           e.preventDefault();
@@ -40,7 +50,6 @@ export const useKeyboardShortcuts = () => {
           break;
         case "/":
           e.preventDefault();
-          // Find the search input and focus it
           const searchInput = document.querySelector(
             'input[placeholder*="Search"]',
           ) as HTMLInputElement;

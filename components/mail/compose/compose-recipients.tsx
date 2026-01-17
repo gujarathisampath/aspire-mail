@@ -26,7 +26,7 @@ const ComposeRecipients = () => {
         <Input
           id="to"
           placeholder="Recipients"
-          className="flex-1 border-0 shadow-none focus-visible:ring-0 px-0"
+          className="flex-1 border-0 shadow-none focus-visible:ring-0"
           {...register("to")}
         />
         <div className="flex gap-1 text-sm shrink-0">
@@ -62,7 +62,7 @@ const ComposeRecipients = () => {
           <Input
             id="cc"
             placeholder="Cc recipients"
-            className="flex-1 border-0 shadow-none focus-visible:ring-0 px-0"
+            className="flex-1 border-0 shadow-none focus-visible:ring-0"
             {...register("cc")}
           />
           <Button
@@ -85,7 +85,7 @@ const ComposeRecipients = () => {
           <Input
             id="bcc"
             placeholder="Bcc recipients"
-            className="flex-1 border-0 shadow-none focus-visible:ring-0 px-0"
+            className="flex-1 border-0 shadow-none focus-visible:ring-0"
             {...register("bcc")}
           />
           <Button
@@ -107,7 +107,7 @@ const ComposeRecipients = () => {
         <Input
           id="subject"
           placeholder="Subject"
-          className="flex-1 border-0 shadow-none focus-visible:ring-0 px-0 font-medium"
+          className="flex-1 border-0 shadow-none focus-visible:ring-0 font-medium"
           {...register("subject")}
         />
       </div>

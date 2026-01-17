@@ -254,9 +254,9 @@ const ComposeToolbar = ({
 
         <Button
           type="button"
-          variant="ghost"
+          variant="destructive"
           onClick={onDiscard}
-          className="text-destructive gap-2"
+          className="bg-destructive/10 hover:bg-destructive/20 text-destructive gap-2"
         >
           <Trash2Icon className="h-4 w-4" />
           Discard

@@ -358,8 +358,8 @@ const MailDisplay = ({ mail }: Props) => {
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
+                  className="hover:bg-destructive/20 text-destructive hover:text-destructive"
                   size="icon"
-                  className="text-destructive hover:text-destructive"
                   onClick={() => deleteMutation.mutate()}
                   disabled={deleteMutation.isPending}
                 >

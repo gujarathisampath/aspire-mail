@@ -15,6 +15,7 @@ import {
   LogOutIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ChevronsUpDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,7 @@ const FOLDER_ICONS: Record<string, any> = {
 };
 
 import { Folder } from "@/lib/types";
+import { Avatar, AvatarFallback } from "../ui/avatar";
 
 const AppSidebar = ({ initialFolders }: { initialFolders?: Folder[] }) => {
   const pathname = usePathname();
@@ -228,20 +230,24 @@ const AppSidebar = ({ initialFolders }: { initialFolders?: Folder[] }) => {
           ) : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start gap-2 px-3"
+                <div
+                  className="flex items-center gap-2 p-2 rounded-md cursor-pointer"
                 >
-                  <span className="truncate text-sm">
-                    {session?.email || "Account"}
-                  </span>
-                </Button>
+                  <Avatar className="h-8 w-8 rounded-md after:rounded-md">
+                    <AvatarFallback className="rounded-md after:rounded-md">{session?.name?.[0]}</AvatarFallback>
+                  </Avatar>
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-medium">{session?.name}</span>
+                    <span className="truncate text-xs">{session?.email}</span>
+                  </div>
+                </div>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56">
                 <DropdownMenuLabel>{session?.name || "User"}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
+                  className="bg-destructive/10 focus:bg-destructive/15"
+                  variant={"destructive"}
                   onClick={() => logoutMutation.mutate()}
                 >
                   <LogOutIcon className="mr-2 h-4 w-4" />

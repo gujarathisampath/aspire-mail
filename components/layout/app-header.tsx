@@ -1,6 +1,6 @@
 "use client";
 
-import { SearchIcon, BellIcon, MenuIcon, LogOutIcon } from "lucide-react";
+import { SearchIcon, BellIcon, MenuIcon, LogOutIcon, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/lib/store/auth-store";
@@ -15,17 +15,31 @@ import {
 import { logoutAction } from "@/lib/actions/auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
+import { Avatar, AvatarFallback } from "../ui/avatar";
+import { useQueryClient } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 
 const AppHeader = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, clearAuth } = useAuthStore();
+  const queryClient = useQueryClient();
 
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     setSearchQuery(searchParams.get("q") || "");
   }, [searchParams]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    // Invalidate all queries starting with 'mails' (this covers all folders/searches)
+    await queryClient.invalidateQueries({ queryKey: ["mails"] });
+    setTimeout(() => {
+      setIsRefreshing(false);
+    }, 1000); // Minimum spin time for visual feedback
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,18 +85,30 @@ const AppHeader = () => {
       </div>
 
       <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+        >
+          <RefreshCw
+            className={cn("h-5 w-5 text-muted-foreground", {
+              "animate-spin": isRefreshing,
+            })}
+          />
+        </Button>
         <Button variant="ghost" size="icon">
           <BellIcon className="h-5 w-5 text-muted-foreground" />
         </Button>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              className="relative h-8 w-8 rounded-full bg-primary text-primary-foreground"
-            >
-              {initials}
-            </Button>
+            <Avatar>
+              {/* <AvatarImage src="https://github.com/shadcn.png" /> */}
+              <AvatarFallback>
+                {initials}
+              </AvatarFallback>
+            </Avatar>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel className="font-normal">
@@ -94,7 +120,8 @@ const AppHeader = () => {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={handleLogout}
-              className="text-destructive"
+              className="bg-destructive/10 focus:bg-destructive/15"
+              variant={"destructive"}
             >
               <LogOutIcon className="mr-2 h-4 w-4" />
               Sign out
