@@ -4,6 +4,12 @@ import * as React from "react";
 import { Cross2Icon } from "@radix-ui/react-icons";
 import * as ToastPrimitives from "@radix-ui/react-toast";
 import { cva, type VariantProps } from "class-variance-authority";
+import {
+  CheckCircle2Icon,
+  AlertCircleIcon,
+  AlertTriangleIcon,
+  InfoIcon,
+} from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -16,7 +22,7 @@ const ToastViewport = React.forwardRef<
   <ToastPrimitives.Viewport
     ref={ref}
     className={cn(
-      "fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]",
+      "fixed top-0 z-[9999] flex max-h-screen w-full flex-col-reverse p-4 sm:right-0 sm:top-0 sm:flex-col md:max-w-[420px]",
       className,
     )}
     {...props}
@@ -32,6 +38,11 @@ const toastVariants = cva(
         default: "border bg-background text-foreground",
         destructive:
           "destructive group border-destructive bg-destructive text-destructive-foreground",
+        success:
+          "border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400",
+        warning:
+          "border-yellow-500/50 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400",
+        info: "border-blue-500/50 bg-blue-500/10 text-blue-700 dark:text-blue-400",
       },
     },
     defaultVariants: {
@@ -39,6 +50,14 @@ const toastVariants = cva(
     },
   },
 );
+
+const toastIconMap = {
+  default: null,
+  destructive: AlertCircleIcon,
+  success: CheckCircle2Icon,
+  warning: AlertTriangleIcon,
+  info: InfoIcon,
+};
 
 const Toast = React.forwardRef<
   React.ElementRef<typeof ToastPrimitives.Root>,
@@ -126,4 +145,5 @@ export {
   ToastDescription,
   ToastClose,
   ToastAction,
+  toastIconMap,
 };

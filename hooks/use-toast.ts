@@ -1,12 +1,11 @@
 "use client";
 
-// Inspired by react-hot-toast library
 import * as React from "react";
 
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast";
 
-const TOAST_LIMIT = 1;
-const TOAST_REMOVE_DELAY = 1000000;
+const TOAST_LIMIT = 3;
+const TOAST_REMOVE_DELAY = 5000; // 5 seconds
 
 type ToasterToast = ToastProps & {
   id: string;
@@ -90,8 +89,6 @@ export const reducer = (state: State, action: Action): State => {
     case "DISMISS_TOAST": {
       const { toastId } = action;
 
-      // ! Side effects ! - This could be extracted into a dismissToast() action,
-      // but I'll keep it here for simplicity
       if (toastId) {
         addToRemoveQueue(toastId);
       } else {
@@ -137,9 +134,9 @@ function dispatch(action: Action) {
   });
 }
 
-type Toast = Omit<ToasterToast, "id">;
+type ToastInput = Omit<ToasterToast, "id">;
 
-function toast({ ...props }: Toast) {
+function createToast({ ...props }: ToastInput) {
   const id = genId();
 
   const update = (props: ToasterToast) =>
@@ -167,6 +164,53 @@ function toast({ ...props }: Toast) {
     update,
   };
 }
+
+// Simple API for toast
+type SimpleToastOptions = {
+  title?: string;
+  description?: string;
+  action?: ToastActionElement;
+  duration?: number;
+};
+
+function toast(options: SimpleToastOptions | string) {
+  if (typeof options === "string") {
+    return createToast({ description: options });
+  }
+  return createToast(options);
+}
+
+toast.success = (options: SimpleToastOptions | string) => {
+  if (typeof options === "string") {
+    return createToast({ description: options, variant: "success" });
+  }
+  return createToast({ ...options, variant: "success" });
+};
+
+toast.error = (options: SimpleToastOptions | string) => {
+  if (typeof options === "string") {
+    return createToast({ description: options, variant: "destructive" });
+  }
+  return createToast({ ...options, variant: "destructive" });
+};
+
+toast.warning = (options: SimpleToastOptions | string) => {
+  if (typeof options === "string") {
+    return createToast({ description: options, variant: "warning" });
+  }
+  return createToast({ ...options, variant: "warning" });
+};
+
+toast.info = (options: SimpleToastOptions | string) => {
+  if (typeof options === "string") {
+    return createToast({ description: options, variant: "info" });
+  }
+  return createToast({ ...options, variant: "info" });
+};
+
+toast.dismiss = (toastId?: string) => {
+  dispatch({ type: "DISMISS_TOAST", toastId });
+};
 
 function useToast() {
   const [state, setState] = React.useState<State>(memoryState);

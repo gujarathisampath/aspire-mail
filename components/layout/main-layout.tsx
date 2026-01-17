@@ -11,10 +11,12 @@ const MainLayout = ({
   children,
   initialFolders,
   user,
+  defaultCollapsed,
 }: {
   children: React.ReactNode;
   initialFolders?: Folder[];
   user?: { email: string; name: string } | null;
+  defaultCollapsed?: boolean;
 }) => {
   const pathname = usePathname();
   useKeyboardShortcuts();
@@ -42,7 +44,10 @@ const MainLayout = ({
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <AppSidebar initialFolders={initialFolders} />
+      <AppSidebar
+        initialFolders={initialFolders}
+        defaultCollapsed={defaultCollapsed}
+      />
       <div className="flex-1 flex flex-col overflow-hidden">
         <AppHeader />
         <main className="flex-1 overflow-hidden relative">{children}</main>

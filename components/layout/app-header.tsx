@@ -1,6 +1,12 @@
 "use client";
 
-import { SearchIcon, BellIcon, MenuIcon, LogOutIcon, RefreshCw } from "lucide-react";
+import {
+  SearchIcon,
+  BellIcon,
+  MenuIcon,
+  LogOutIcon,
+  RefreshCw,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/lib/store/auth-store";
@@ -16,7 +22,7 @@ import { logoutAction } from "@/lib/actions/auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Avatar, AvatarFallback } from "../ui/avatar";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useIsFetching } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
 const AppHeader = () => {
@@ -28,17 +34,23 @@ const AppHeader = () => {
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const isFetchingMails = useIsFetching({ queryKey: ["mails"] }) > 0;
+  const isFetchingFolders = useIsFetching({ queryKey: ["folders"] }) > 0;
+  const isFetchingDetails = useIsFetching({ queryKey: ["mail-details"] }) > 0;
+  const isGlobalFetching =
+    isFetchingMails || isFetchingFolders || isFetchingDetails || isRefreshing;
+
   useEffect(() => {
     setSearchQuery(searchParams.get("q") || "");
   }, [searchParams]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    // Invalidate all queries starting with 'mails' (this covers all folders/searches)
     await queryClient.invalidateQueries({ queryKey: ["mails"] });
+    await queryClient.invalidateQueries({ queryKey: ["folders"] });
     setTimeout(() => {
       setIsRefreshing(false);
-    }, 1000); // Minimum spin time for visual feedback
+    }, 500);
   };
 
   const handleSearch = (e: React.FormEvent) => {
@@ -89,11 +101,11 @@ const AppHeader = () => {
           variant="ghost"
           size="icon"
           onClick={handleRefresh}
-          disabled={isRefreshing}
+          disabled={isGlobalFetching}
         >
           <RefreshCw
             className={cn("h-5 w-5 text-muted-foreground", {
-              "animate-spin": isRefreshing,
+              "animate-spin": isGlobalFetching,
             })}
           />
         </Button>
@@ -105,9 +117,7 @@ const AppHeader = () => {
           <DropdownMenuTrigger asChild>
             <Avatar>
               {/* <AvatarImage src="https://github.com/shadcn.png" /> */}
-              <AvatarFallback>
-                {initials}
-              </AvatarFallback>
+              <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">

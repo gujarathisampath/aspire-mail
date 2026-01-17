@@ -3,6 +3,13 @@ export interface MailContact {
   address: string;
 }
 
+export interface Attachment {
+  filename: string;
+  contentType: string;
+  size: number;
+  contentId?: string;
+}
+
 export interface Mail {
   id: string;
   from: MailContact;
@@ -16,6 +23,7 @@ export interface Mail {
   read: boolean;
   starred: boolean;
   hasAttachments?: boolean;
+  attachments?: Attachment[];
 }
 
 export interface Folder {

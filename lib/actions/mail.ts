@@ -46,12 +46,14 @@ export const getImapClient = async () => {
   });
 };
 
-export const getMailContentAction = async (
+export const getMailDetailsAction = async (
   folderId: string,
   uid: string,
-): Promise<string> => {
+): Promise<{ content: string; attachments: any[] }> => {
   const client = await getImapClient();
   let content = "";
+  let attachments: any[] = [];
+
   try {
     await client.connect();
     const targetFolder = await resolveFolder(client, folderId);
@@ -60,19 +62,43 @@ export const getMailContentAction = async (
     try {
       const message = await client.fetchOne(
         uid,
-        { source: true },
+        { source: true, bodyStructure: true },
         { uid: true },
       );
-      if (message && message.source) {
-        const parsed = await simpleParser(message.source);
-        content = parsed.html || parsed.textAsHtml || parsed.text || "";
+
+      if (message) {
+        if (message.source) {
+          const parsed = await simpleParser(message.source);
+          content = parsed.html || parsed.textAsHtml || parsed.text || "";
+        }
+
+        const findAttachments = (part: any) => {
+          if (
+            part.disposition?.toLowerCase() === "attachment" ||
+            part.parameters?.name ||
+            part.parameters?.filename
+          ) {
+            attachments.push({
+              id: part.part,
+              filename:
+                part.parameters?.filename || part.parameters?.name || "unnamed",
+              contentType: part.contentType,
+              size: part.size,
+              contentId: part.contentId,
+            });
+          }
+          if (part.childNodes) {
+            part.childNodes.forEach(findAttachments);
+          }
+        };
+        if (message.bodyStructure) findAttachments(message.bodyStructure);
       }
     } finally {
       lock.release();
     }
   } catch (error: any) {
-    console.error("[IMAP] getMailContentAction Error:", error.message);
-    return "";
+    console.error("[IMAP] getMailDetailsAction Error:", error.message);
+    return { content: "", attachments: [] };
   } finally {
     try {
       await client.logout();
@@ -80,7 +106,78 @@ export const getMailContentAction = async (
       client.close();
     }
   }
-  return content;
+  return { content, attachments };
+};
+
+export const downloadAttachmentAction = async (
+  folderId: string,
+  uid: string,
+  partId: string,
+) => {
+  const client = await getImapClient();
+  try {
+    await client.connect();
+    const targetFolder = await resolveFolder(client, folderId);
+    const lock = await client.getMailboxLock(targetFolder);
+
+    try {
+      // Fetch only the specific attachment part
+      const message = await client.fetchOne(
+        uid,
+        { bodyParts: [partId] },
+        { uid: true },
+      );
+
+      const structure = await client.fetchOne(
+        uid,
+        { bodyStructure: true },
+        { uid: true },
+      );
+
+      // Find metadata for this part
+      let metadata: any = null;
+      const findPart = (part: any) => {
+        if (part.part === partId) {
+          metadata = part;
+          return true;
+        }
+        if (part.childNodes) {
+          for (const child of part.childNodes) {
+            if (findPart(child)) return true;
+          }
+        }
+        return false;
+      };
+      if (structure && structure.bodyStructure)
+        findPart(structure.bodyStructure);
+
+      if (message && message.bodyParts) {
+        const content = message.bodyParts.get(partId);
+        if (content) {
+          return {
+            filename:
+              metadata?.parameters?.filename ||
+              metadata?.parameters?.name ||
+              "download",
+            contentType: metadata?.contentType || "application/octet-stream",
+            content: content.toString("base64"),
+          };
+        }
+      }
+    } finally {
+      lock.release();
+    }
+  } catch (error: any) {
+    console.error("[IMAP] downloadAttachmentAction Error:", error.message);
+    return null;
+  } finally {
+    try {
+      await client.logout();
+    } catch {
+      client.close();
+    }
+  }
+  return null;
 };
 
 export const resolveFolder = async (client: ImapFlow, slug: string) => {
@@ -162,12 +259,16 @@ const getMails = async (
       }
 
       if (range && (Array.isArray(range) ? range.length > 0 : true)) {
-        for await (const message of client.fetch(range, {
-          envelope: true,
-          flags: true,
-          uid: true,
-          bodyStructure: true,
-        })) {
+        for await (const message of client.fetch(
+          range,
+          {
+            envelope: true,
+            flags: true,
+            uid: true,
+            bodyStructure: true,
+          },
+          { uid: Array.isArray(range) },
+        )) {
           if (message.envelope && message.uid) {
             // Check for attachments in bodyStructure
             let hasAttachments = false;
@@ -184,24 +285,29 @@ const getMails = async (
               checkPart(message.bodyStructure);
             }
 
+            const cleanName = (name?: string) => {
+              if (!name) return "";
+              return name.replace(/^['"]|['"]$/g, "").trim();
+            };
+
             mails.push({
               id: message.uid.toString(),
               from: {
-                name: message.envelope.from?.[0]?.name || "",
+                name: cleanName(message.envelope.from?.[0]?.name),
                 address: message.envelope.from?.[0]?.address || "",
               },
               subject: message.envelope.subject || "(No Subject)",
               to:
                 message.envelope.to?.map((t) => ({
-                  name: t.name,
+                  name: cleanName(t.name),
                   address: t.address || "",
                 })) || [],
               cc: message.envelope.cc?.map((t) => ({
-                name: t.name,
+                name: cleanName(t.name),
                 address: t.address || "",
               })),
               bcc: message.envelope.bcc?.map((t) => ({
-                name: t.name,
+                name: cleanName(t.name),
                 address: t.address || "",
               })),
               preview: "", // Content will be fetched on demand
@@ -240,9 +346,10 @@ const getFolders = async (): Promise<Folder[]> => {
   const client = await getImapClient();
   try {
     await client.connect();
+    // List all folders first
     const mailboxes = await client.list();
-    const folders: Folder[] = [];
 
+    const folders: Folder[] = [];
     const reverseSpecialUseMap: Record<string, string> = {
       "\\Inbox": "inbox",
       "\\Sent": "sent",
@@ -254,11 +361,20 @@ const getFolders = async (): Promise<Folder[]> => {
     };
 
     for (const mailbox of mailboxes) {
+      if (
+        mailbox.flags.has("\\Noselect") &&
+        !mailbox.flags.has("\\HasChildren")
+      )
+        continue;
+
       try {
-        const status = await client.status(mailbox.path, {
-          messages: true,
-          unseen: true,
-        });
+        let status = null;
+        if (!mailbox.flags.has("\\Noselect")) {
+          status = await client.status(mailbox.path, {
+            messages: true,
+            unseen: true,
+          });
+        }
 
         let slug = mailbox.name.toLowerCase();
         if (mailbox.path.toUpperCase() === "INBOX") {
@@ -285,8 +401,8 @@ const getFolders = async (): Promise<Folder[]> => {
           id: mailbox.path,
           name: mailbox.name || mailbox.path,
           slug,
-          unreadCount: status.unseen || 0,
-          totalCount: status.messages || 0,
+          unreadCount: status?.unseen || 0,
+          totalCount: status?.messages || 0,
         });
       } catch {
         // Skip inaccessible folders

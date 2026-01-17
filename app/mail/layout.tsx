@@ -1,13 +1,20 @@
 import MainLayout from "@/components/layout/main-layout";
 import { getFoldersAction } from "@/lib/actions/mail";
 import { getSessionAction } from "@/lib/actions/auth";
+import { cookies } from "next/headers";
 
 const MailLayout = async ({ children }: { children: React.ReactNode }) => {
   const initialFolders = await getFoldersAction();
   const session = await getSessionAction();
+  const cookieStore = await cookies();
+  const defaultCollapsed = cookieStore.get("sidebar-collapsed")?.value === "true";
 
   return (
-    <MainLayout initialFolders={initialFolders} user={session}>
+    <MainLayout
+      initialFolders={initialFolders}
+      user={session}
+      defaultCollapsed={defaultCollapsed}
+    >
       {children}
     </MainLayout>
   );

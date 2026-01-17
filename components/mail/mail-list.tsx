@@ -13,15 +13,16 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState, useMemo } from "react";
 import { MailIcon, StarIcon, PaperclipIcon } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { getMailContentAction } from "@/lib/actions/mail";
+import { getMailDetailsAction } from "@/lib/actions/mail";
 
 interface Props {
   mails: Mail[];
+  currentUserEmail?: string;
 }
 
 type FilterType = "all" | "unread" | "read";
 
-const MailList = ({ mails }: Props) => {
+const MailList = ({ mails, currentUserEmail }: Props) => {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -37,8 +38,8 @@ const MailList = ({ mails }: Props) => {
 
   const handlePrefetch = (uid: string) => {
     queryClient.prefetchQuery({
-      queryKey: ["mail-content", folderId, uid],
-      queryFn: () => getMailContentAction(folderId, uid),
+      queryKey: ["mail-details", folderId, uid, currentUserEmail],
+      queryFn: () => getMailDetailsAction(folderId, uid),
       staleTime: Infinity,
     });
   };
@@ -48,7 +49,6 @@ const MailList = ({ mails }: Props) => {
     params.set("id", id);
     router.replace(`${pathname}?${params.toString()}`);
   };
-
   const filteredMails = useMemo(() => {
     return mails.filter((mail) => {
       const matchesSearch =
@@ -114,7 +114,7 @@ const MailList = ({ mails }: Props) => {
                   onMouseEnter={() => handlePrefetch(mail.id)}
                   className={cn(
                     "flex flex-col gap-1.5 p-4 text-left border-b transition-colors",
-                    isSelected ? "bg-secondary" : "hover:bg-secondary/60",
+                    isSelected ? "bg-secondary/80" : "hover:bg-secondary/40",
                     !mail.read && !isSelected && "bg-secondary/60",
                   )}
                 >
@@ -139,7 +139,7 @@ const MailList = ({ mails }: Props) => {
                         <PaperclipIcon className="h-3 w-3" />
                       )}
                       {formatDistanceToNow(new Date(mail.date), {
-                        addSuffix: false,
+                        addSuffix: true,
                       })}
                     </span>
                   </div>

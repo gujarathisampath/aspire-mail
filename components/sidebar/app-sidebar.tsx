@@ -53,53 +53,79 @@ const FOLDER_ICONS: Record<string, any> = {
 import { Folder } from "@/lib/types";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 
-const AppSidebar = ({ initialFolders }: { initialFolders?: Folder[] }) => {
+const AppSidebar = ({
+  initialFolders,
+  defaultCollapsed = false,
+}: {
+  initialFolders?: Folder[];
+  defaultCollapsed?: boolean;
+}) => {
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { clearAuth } = useAuthStore();
-  const [collapsed, setCollapsed] = useState(false);
-
-  const { data: folders, isLoading } = useQuery({
-    queryKey: ["folders"],
-    queryFn: () => getFoldersAction(),
-    initialData: initialFolders,
-    refetchInterval: 60000,
-  });
-
-  const handlePrefetch = (slug: string) => {
-    queryClient.prefetchQuery({
-      queryKey: ["mails", slug],
-      queryFn: () => getMailsAction(slug),
-      staleTime: 10 * 1000, // 10 seconds stale time for prefetch
-    });
-  };
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
   const { data: session } = useQuery({
     queryKey: ["session"],
     queryFn: () => getSessionAction(),
-    staleTime: Infinity,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
+
+  const { data: folders, isLoading } = useQuery({
+    queryKey: ["folders", session?.email],
+    queryFn: () => getFoldersAction(),
+    initialData: initialFolders,
+    refetchInterval: 60000,
+    enabled: !!session?.email,
+  });
+
+  const [prefetchTimeout, setPrefetchTimeout] = useState<NodeJS.Timeout | null>(
+    null,
+  );
+
+  const handlePrefetch = (slug: string) => {
+    if (prefetchTimeout) clearTimeout(prefetchTimeout);
+    if (!session?.email) return;
+
+    const timeout = setTimeout(() => {
+      queryClient.prefetchQuery({
+        queryKey: ["mails", slug, "", session.email],
+        queryFn: () => getMailsAction(slug),
+        staleTime: 30 * 1000,
+      });
+    }, 100);
+
+    setPrefetchTimeout(timeout);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (prefetchTimeout) clearTimeout(prefetchTimeout);
+    };
+  }, [prefetchTimeout]);
 
   const logoutMutation = useMutation({
     mutationFn: () => logoutAction(),
     onSuccess: () => {
       clearAuth();
+      queryClient.removeQueries();
       queryClient.clear();
-      router.push("/login");
+      router.replace("/login");
       router.refresh();
     },
   });
 
-  useEffect(() => {
-    const saved = localStorage.getItem("sidebar-collapsed");
-    if (saved === "true") setCollapsed(true);
-  }, []);
-
   const toggleCollapsed = () => {
     const newState = !collapsed;
     setCollapsed(newState);
+    document.cookie = `sidebar-collapsed=${newState}; path=/; max-age=31536000; SameSite=Lax`;
     localStorage.setItem("sidebar-collapsed", String(newState));
+  };
+
+  const clearPrefetch = () => {
+    if (prefetchTimeout) clearTimeout(prefetchTimeout);
   };
 
   return (
@@ -159,6 +185,7 @@ const AppSidebar = ({ initialFolders }: { initialFolders?: Folder[] }) => {
                         className="w-full mb-1"
                         asChild
                         onMouseEnter={() => handlePrefetch(folder.slug)}
+                        onMouseLeave={clearPrefetch}
                       >
                         <Link href={href}>
                           <Icon className="h-4 w-4" />
@@ -191,6 +218,7 @@ const AppSidebar = ({ initialFolders }: { initialFolders?: Folder[] }) => {
                   )}
                   asChild
                   onMouseEnter={() => handlePrefetch(folder.slug)}
+                  onMouseLeave={clearPrefetch}
                 >
                   <Link href={href}>
                     <Icon className="h-4 w-4 shrink-0" />
@@ -230,14 +258,16 @@ const AppSidebar = ({ initialFolders }: { initialFolders?: Folder[] }) => {
           ) : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <div
-                  className="flex items-center gap-2 p-2 rounded-md cursor-pointer"
-                >
+                <div className="flex items-center gap-2 p-2 rounded-md cursor-pointer">
                   <Avatar className="h-8 w-8 rounded-md after:rounded-md">
-                    <AvatarFallback className="rounded-md after:rounded-md">{session?.name?.[0]}</AvatarFallback>
+                    <AvatarFallback className="rounded-md after:rounded-md">
+                      {session?.name?.[0]}
+                    </AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-medium">{session?.name}</span>
+                    <span className="truncate font-medium">
+                      {session?.name}
+                    </span>
                     <span className="truncate text-xs">{session?.email}</span>
                   </div>
                 </div>
