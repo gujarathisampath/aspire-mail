@@ -595,11 +595,11 @@ const MailDisplay = ({ mail }: Props) => {
       {/* Quick Reply Footer */}
       <div className="p-6 border-t shrink-0">
         <div className="flex gap-3 max-w-4xl mx-auto">
-          <Button variant="outline" className="gap-2" onClick={handleReply}>
+          <Button variant="secondary" className="gap-2" onClick={handleReply}>
             <ReplyIcon className="h-4 w-4" />
             Reply
           </Button>
-          <Button variant="outline" className="gap-2" onClick={handleForward}>
+          <Button variant="secondary" className="gap-2" onClick={handleForward}>
             <ForwardIcon className="h-4 w-4" />
             Forward
           </Button>

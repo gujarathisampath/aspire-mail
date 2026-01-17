@@ -114,8 +114,8 @@ const MailList = ({ mails }: Props) => {
                   onMouseEnter={() => handlePrefetch(mail.id)}
                   className={cn(
                     "flex flex-col gap-1.5 p-4 text-left border-b transition-colors",
-                    isSelected ? "bg-accent" : "hover:bg-muted/50",
-                    !mail.read && !isSelected && "bg-accent/30",
+                    isSelected ? "bg-secondary" : "hover:bg-secondary/60",
+                    !mail.read && !isSelected && "bg-secondary/60",
                   )}
                 >
                   <div className="flex items-center justify-between gap-2">
