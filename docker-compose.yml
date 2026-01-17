@@ -1,15 +1,15 @@
-version: '3'
-
 services:
   aspire-mail:
     container_name: aspire-mail
     build:
       context: .
       dockerfile: Dockerfile
+    image: sagargujarathi/aspire-mail:latest
     restart: always
     ports:
-      - "${PORT}:${PORT}"
+      - "${PORT:-3000}:${PORT:-3000}"
     env_file:
       - .env
     environment:
       - NODE_ENV=production
+      - PORT=${PORT:-3000}
