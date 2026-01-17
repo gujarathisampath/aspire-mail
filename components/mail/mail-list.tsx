@@ -13,7 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState, useMemo } from "react";
 import { MailIcon, StarIcon, PaperclipIcon } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { getMailContentAction } from "@/lib/actions/mail";
+import { getMailDetailsAction } from "@/lib/actions/mail";
 
 interface Props {
   mails: Mail[];
@@ -37,8 +37,8 @@ const MailList = ({ mails }: Props) => {
 
   const handlePrefetch = (uid: string) => {
     queryClient.prefetchQuery({
-      queryKey: ["mail-content", folderId, uid],
-      queryFn: () => getMailContentAction(folderId, uid),
+      queryKey: ["mail-details", folderId, uid],
+      queryFn: () => getMailDetailsAction(folderId, uid),
       staleTime: Infinity,
     });
   };

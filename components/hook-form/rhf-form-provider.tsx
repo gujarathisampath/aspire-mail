@@ -3,16 +3,15 @@
 import { ReactNode } from "react";
 import { FormProvider, UseFormReturn } from "react-hook-form";
 
-interface Props {
+interface Props extends React.FormHTMLAttributes<HTMLFormElement> {
   children: ReactNode;
   methods: UseFormReturn<any>;
-  onSubmit?: (data: any) => void;
 }
 
-const RHFFormProvider = ({ children, methods, onSubmit }: Props) => {
+const RHFFormProvider = ({ children, methods, onSubmit, ...props }: Props) => {
   return (
     <FormProvider {...methods}>
-      <form onSubmit={onSubmit} className="w-full h-full">
+      <form onSubmit={onSubmit} className="w-full h-full" {...props}>
         {children}
       </form>
     </FormProvider>

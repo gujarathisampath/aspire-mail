@@ -67,13 +67,29 @@ const AppSidebar = ({ initialFolders }: { initialFolders?: Folder[] }) => {
     refetchInterval: 60000,
   });
 
+  const [prefetchTimeout, setPrefetchTimeout] = useState<NodeJS.Timeout | null>(
+    null,
+  );
+
   const handlePrefetch = (slug: string) => {
-    queryClient.prefetchQuery({
-      queryKey: ["mails", slug],
-      queryFn: () => getMailsAction(slug),
-      staleTime: 10 * 1000, // 10 seconds stale time for prefetch
-    });
+    if (prefetchTimeout) clearTimeout(prefetchTimeout);
+
+    const timeout = setTimeout(() => {
+      queryClient.prefetchQuery({
+        queryKey: ["mails", slug],
+        queryFn: () => getMailsAction(slug),
+        staleTime: 30 * 1000,
+      });
+    }, 100);
+
+    setPrefetchTimeout(timeout);
   };
+
+  useEffect(() => {
+    return () => {
+      if (prefetchTimeout) clearTimeout(prefetchTimeout);
+    };
+  }, [prefetchTimeout]);
 
   const { data: session } = useQuery({
     queryKey: ["session"],
@@ -100,6 +116,10 @@ const AppSidebar = ({ initialFolders }: { initialFolders?: Folder[] }) => {
     const newState = !collapsed;
     setCollapsed(newState);
     localStorage.setItem("sidebar-collapsed", String(newState));
+  };
+
+  const clearPrefetch = () => {
+    if (prefetchTimeout) clearTimeout(prefetchTimeout);
   };
 
   return (
@@ -159,6 +179,7 @@ const AppSidebar = ({ initialFolders }: { initialFolders?: Folder[] }) => {
                         className="w-full mb-1"
                         asChild
                         onMouseEnter={() => handlePrefetch(folder.slug)}
+                        onMouseLeave={clearPrefetch}
                       >
                         <Link href={href}>
                           <Icon className="h-4 w-4" />
@@ -191,6 +212,7 @@ const AppSidebar = ({ initialFolders }: { initialFolders?: Folder[] }) => {
                   )}
                   asChild
                   onMouseEnter={() => handlePrefetch(folder.slug)}
+                  onMouseLeave={clearPrefetch}
                 >
                   <Link href={href}>
                     <Icon className="h-4 w-4 shrink-0" />
@@ -230,14 +252,16 @@ const AppSidebar = ({ initialFolders }: { initialFolders?: Folder[] }) => {
           ) : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <div
-                  className="flex items-center gap-2 p-2 rounded-md cursor-pointer"
-                >
+                <div className="flex items-center gap-2 p-2 rounded-md cursor-pointer">
                   <Avatar className="h-8 w-8 rounded-md after:rounded-md">
-                    <AvatarFallback className="rounded-md after:rounded-md">{session?.name?.[0]}</AvatarFallback>
+                    <AvatarFallback className="rounded-md after:rounded-md">
+                      {session?.name?.[0]}
+                    </AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-medium">{session?.name}</span>
+                    <span className="truncate font-medium">
+                      {session?.name}
+                    </span>
                     <span className="truncate text-xs">{session?.email}</span>
                   </div>
                 </div>

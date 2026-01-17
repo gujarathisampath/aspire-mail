@@ -13,6 +13,7 @@ interface Props {
   initialMails?: Mail[];
   selectedId?: string;
   searchQuery?: string;
+  session: { email: string; name: string } | null;
 }
 
 const FolderView = ({
@@ -20,6 +21,7 @@ const FolderView = ({
   initialMails,
   selectedId,
   searchQuery,
+  session,
 }: Props) => {
   const {
     data: mails,
@@ -30,8 +32,8 @@ const FolderView = ({
     queryKey: ["mails", folder, searchQuery],
     queryFn: () => getMailsAction(folder, searchQuery),
     initialData: initialMails,
-    refetchInterval: 30000,
-    staleTime: 60 * 1000,
+    refetchInterval: 60000,
+    staleTime: 5 * 60 * 1000, // 5 minutes (user can manual refresh)
     placeholderData: (previousData) => previousData,
   });
 
@@ -54,11 +56,14 @@ const FolderView = ({
 
   return (
     <div className="flex h-full">
-      <div className="w-[350px] flex-none border-r">
+      <div className="w-[350px] flex-none border-r text-sidebar-foreground">
         <MailList mails={mails || []} />
       </div>
-      <div className="flex-1">
-        <MailDisplay mail={selectedMail} />
+      <div className="flex-1 overflow-hidden">
+        <MailDisplay
+          mail={selectedMail}
+          currentUserEmail={session?.email || ""}
+        />
       </div>
     </div>
   );

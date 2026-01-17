@@ -9,7 +9,7 @@ import { Editor } from "@tiptap/react";
 import { ArrowLeftIcon, FileIcon, XIcon, SaveIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 
 import { sendMailAction, AttachmentData } from "@/lib/actions/send";
@@ -24,7 +24,7 @@ import LinkDialog from "@/components/mail/compose/link-dialog";
 const ComposePage = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { toast } = useToast();
+
   const [editor, setEditor] = useState<Editor | null>(null);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [attachments, setAttachments] = useState<AttachmentData[]>([]);
@@ -63,27 +63,16 @@ const ComposePage = () => {
     mutationFn: sendMailAction,
     onSuccess: (result) => {
       if (result.success) {
-        toast({
-          title: "Email sent",
-          description: "Your message has been sent successfully.",
-        });
+        toast.success("Email sent successfully");
         queryClient.invalidateQueries({ queryKey: ["mails"] });
         queryClient.invalidateQueries({ queryKey: ["folders"] });
         router.push("/mail/sent");
       } else {
-        toast({
-          title: "Failed to send",
-          description: result.error || "An error occurred while sending.",
-          variant: "destructive",
-        });
+        toast.error(result.error || "Failed to send email");
       }
     },
     onError: () => {
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred.",
-        variant: "destructive",
-      });
+      toast.error("An unexpected error occurred.");
     },
   });
 
@@ -91,18 +80,11 @@ const ComposePage = () => {
     mutationFn: saveDraftAction,
     onSuccess: (result) => {
       if (result.success) {
-        toast({
-          title: "Draft saved",
-          description: "Your draft has been saved.",
-        });
+        toast.success("Draft saved");
         queryClient.invalidateQueries({ queryKey: ["mails", "drafts"] });
         queryClient.invalidateQueries({ queryKey: ["folders"] });
       } else {
-        toast({
-          title: "Failed to save draft",
-          description: result.error || "An error occurred.",
-          variant: "destructive",
-        });
+        toast.error(result.error || "Failed to save draft");
       }
     },
   });

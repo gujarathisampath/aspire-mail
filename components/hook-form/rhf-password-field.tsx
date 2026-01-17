@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useFormContext, Controller } from "react-hook-form";
 import { Input } from "@/components/ui/input";
 import {
@@ -8,7 +9,8 @@ import {
   FieldContent,
   FieldError,
 } from "@/components/ui/field";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { EyeIcon, EyeOffIcon } from "lucide-react";
 
 interface Props extends React.InputHTMLAttributes<HTMLInputElement> {
   name: string;
@@ -17,16 +19,16 @@ interface Props extends React.InputHTMLAttributes<HTMLInputElement> {
   required?: boolean;
 }
 
-const RHFTextField = ({
+const RHFPasswordField = ({
   name,
   label,
   helperText,
   required,
-  type = "text",
   className,
   ...other
 }: Props) => {
   const { control } = useFormContext();
+  const [showPassword, setShowPassword] = useState(false);
 
   return (
     <Controller
@@ -41,22 +43,30 @@ const RHFTextField = ({
             </FieldLabel>
           )}
           <FieldContent>
-            <Input
-              {...field}
-              {...other}
-              id={name}
-              type={type}
-              className={className}
-              aria-invalid={!!error}
-              value={type === "number" && field.value === 0 ? "" : field.value}
-              onChange={(event) => {
-                if (type === "number") {
-                  field.onChange(Number(event.target.value));
-                } else {
-                  field.onChange(event.target.value);
-                }
-              }}
-            />
+            <div className="relative">
+              <Input
+                {...field}
+                {...other}
+                id={name}
+                type={showPassword ? "text" : "password"}
+                className={className}
+                aria-invalid={!!error}
+                value={field.value ?? ""}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? (
+                  <EyeOffIcon className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <EyeIcon className="h-4 w-4 text-muted-foreground" />
+                )}
+              </Button>
+            </div>
             {error ? (
               <FieldError>{error.message}</FieldError>
             ) : (
@@ -73,4 +83,4 @@ const RHFTextField = ({
   );
 };
 
-export default RHFTextField;
+export default RHFPasswordField;
