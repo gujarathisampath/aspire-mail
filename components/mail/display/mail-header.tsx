@@ -69,7 +69,7 @@ export const MailDisplayHeader = ({ mail, currentUserEmail }: Props) => {
                   </Badge>
                 )}
                 <CollapsibleTrigger asChild>
-                  <button className="ml-1 p-0.5 rounded-sm hover:bg-muted focus:outline-none">
+                  <button className="ml-1 p-0.5 rounded-sm">
                     <ChevronDownIcon className="h-3 w-3 opacity-50 hover:opacity-100 transition-opacity" />
                   </button>
                 </CollapsibleTrigger>
