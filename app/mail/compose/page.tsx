@@ -49,6 +49,7 @@ const ComposePage = () => {
     },
   });
   const { handleSubmit, reset, watch, getValues } = methods;
+  // eslint-disable-next-line react-hooks/incompatible-library
   const subject = watch("subject");
 
   useEffect(() => {
@@ -58,23 +59,6 @@ const ComposePage = () => {
   }, [editor, initialContent]);
 
   const queryClient = useQueryClient();
-
-  const sendMutation = useMutation({
-    mutationFn: sendMailAction,
-    onSuccess: (result) => {
-      if (result.success) {
-        toast.success("Email sent successfully");
-        queryClient.invalidateQueries({ queryKey: ["mails"] });
-        queryClient.invalidateQueries({ queryKey: ["folders"] });
-        router.push("/mail/sent");
-      } else {
-        toast.error(result.error || "Failed to send email");
-      }
-    },
-    onError: () => {
-      toast.error("An unexpected error occurred.");
-    },
-  });
 
   const saveDraftMutation = useMutation({
     mutationFn: saveDraftAction,
@@ -90,14 +74,33 @@ const ComposePage = () => {
   });
 
   const onSubmit = (data: SendMailFormData) => {
-    sendMutation.mutate({
-      to: data.to,
-      cc: data.cc,
-      bcc: data.bcc,
-      subject: data.subject,
-      content: data.content,
-      attachments: attachments,
+    const promise = async () => {
+      const result = await sendMailAction({
+        to: data.to,
+        cc: data.cc,
+        bcc: data.bcc,
+        subject: data.subject,
+        content: data.content,
+        attachments: attachments,
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to send email");
+      }
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["mails"] }),
+        queryClient.invalidateQueries({ queryKey: ["folders"] }),
+      ]);
+    };
+
+    toast.promise(promise(), {
+      loading: "Sending email...",
+      success: "Email sent successfully",
+      error: (err) => err.message || "Failed to send email",
     });
+
+    router.push("/mail/sent");
   };
 
   const handleSaveDraft = () => {
@@ -271,7 +274,7 @@ const ComposePage = () => {
           onDiscard={handleDiscard}
           onLink={() => setLinkDialogOpen(true)}
           onAttach={handleAttachClick}
-          isSending={sendMutation.isPending}
+          isSending={false}
         />
 
         {/* Link Dialog */}

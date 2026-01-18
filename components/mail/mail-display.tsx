@@ -46,7 +46,7 @@ const MailDisplay = ({ mail, currentUserEmail }: Props) => {
         />
 
         <div className="flex-1 overflow-y-auto">
-          <MailDisplayHeader mail={mail} />
+          <MailDisplayHeader mail={mail} currentUserEmail={currentUserEmail} />
           <MailDisplayContent mail={mail} folderId={folderId} currentUserEmail={currentUserEmail} />
         </div>
 

@@ -14,23 +14,19 @@ export const useKeyboardShortcuts = () => {
   };
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger if user is typing in an input/textarea
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||
-        (e.target as HTMLElement).isContentEditable
+        (e.target as HTMLElement).isContentEditable || e.ctrlKey
       ) {
         return;
       }
+
 
       switch (e.key.toLowerCase()) {
         case "r":
           e.preventDefault();
           router.refresh();
-          break;
-        case "c":
-          e.preventDefault();
-          router.push("/mail/compose");
           break;
         case "i":
           e.preventDefault();

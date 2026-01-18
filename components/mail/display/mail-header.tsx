@@ -13,16 +13,33 @@ import { ChevronDownIcon } from "lucide-react";
 
 interface Props {
   mail: Mail;
+  currentUserEmail: string;
 }
 
 // ----------------------------------------------------------------------
 
-export const MailDisplayHeader = ({ mail }: Props) => {
+export const MailDisplayHeader = ({ mail, currentUserEmail }: Props) => {
   const senderName = mail.from?.name || mail.from?.address || "Unknown";
   const senderInitials = senderName.charAt(0).toUpperCase();
-  const toList = mail.to?.map((t) => t.name || t.address).join(", ") || "me";
+  const toList = mail.to?.map((t) => t.address).join(", ") || "me";
   const hasCc = mail.cc && mail.cc.length > 0;
+  
 
+  const formattedSender = (() => {
+    const recipients = mail.to
+      .map((c) => {
+        if (
+          currentUserEmail &&
+          c.address.toLowerCase() === currentUserEmail.toLowerCase()
+        ) {
+          return "me";
+        }
+        return c.name || c.address;
+      })
+      .join(", ");
+
+    return recipients.length > 30 ? recipients.slice(0, 30) + "..." : recipients;
+  })();
   return (
     <div className="flex flex-col gap-4 p-6 md:p-8 pb-4">
       {/* Sender Row */}
@@ -44,7 +61,7 @@ export const MailDisplayHeader = ({ mail }: Props) => {
             <Collapsible>
               <div className="flex items-center gap-1 text-sm text-muted-foreground group">
                 <span className="text-sm text-muted-foreground">
-                  to {toList.length > 30 ? toList.slice(0, 30) + "..." : toList}
+                  to {formattedSender}
                 </span>
                 {hasCc && (
                   <Badge variant="outline" className="text-[10px] h-4 px-1">
@@ -85,7 +102,7 @@ export const MailDisplayHeader = ({ mail }: Props) => {
           </div>
         </div>
 
-        <time className="text-xs text-muted-foreground flex-shrink-0 tabular-nums">
+        <time className="text-xs text-muted-foreground shrink-0 tabular-nums">
           {format(new Date(mail.date), "MMM d, h:mm a")}
         </time>
       </div>

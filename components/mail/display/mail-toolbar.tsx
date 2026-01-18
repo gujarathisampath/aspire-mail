@@ -212,7 +212,8 @@ export const MailDisplayToolbar = ({
             />
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
+              className="bg-destructive/10 focus:bg-destructive/15"
+              variant={"destructive"}
               onClick={() => deleteMutation.mutate()}
             >
               <Trash2Icon className="mr-2 h-4 w-4" />

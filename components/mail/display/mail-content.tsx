@@ -137,7 +137,7 @@ export const MailDisplayContent = ({ mail, folderId, currentUserEmail }: Props) 
   // Loading state
   if (isLoading) {
     return (
-      <div className="py-6 md:p-8 space-y-3 pl-13">
+      <div className="flex flex-col px-6 md:px-8 space-y-3 ml-13">
         <Skeleton className="h-4 w-3/4" />
         <Skeleton className="h-4 w-full" />
         <Skeleton className="h-4 w-5/6" />
