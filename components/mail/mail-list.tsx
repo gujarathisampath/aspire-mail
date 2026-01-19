@@ -8,7 +8,7 @@ import {
 } from "next/navigation";
 import { Mail } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
+
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState, useMemo } from "react";
 import { MailIcon, StarIcon, PaperclipIcon } from "lucide-react";
@@ -104,8 +104,33 @@ const MailList = ({ mails, currentUserEmail }: Props) => {
           <div className="flex flex-col">
             {filteredMails.map((mail) => {
               const isSelected = selectedId === mail.id;
-              const senderName =
-                mail.from?.name || mail.from?.address || "Unknown";
+              
+              // Determine display name based on folder
+              let displayName = "";
+              const isSent = folderId === "sent" || rawFolder.toLowerCase() === "sent";
+
+              if (isSent) {
+                if (mail.to && mail.to.length > 0) {
+                   const names = mail.to.map((t) => t.name || t.address).join(", ");
+                   displayName = `To: ${names}`;
+                } else {
+                   displayName = "To: Unknown";
+                }
+              } else {
+                displayName = mail.from?.name || mail.from?.address || "Unknown";
+              }
+
+              // Format date
+              const date = new Date(mail.date);
+              const now = new Date();
+              let dateDisplay = "";
+              if (date.toDateString() === now.toDateString()) {
+                dateDisplay = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+              } else if (date.getFullYear() === now.getFullYear()) {
+                dateDisplay = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+              } else {
+                dateDisplay = date.toLocaleDateString([], { month: 'numeric', day: 'numeric', year: 'numeric' });
+              }
 
               return (
                 <button
@@ -113,49 +138,55 @@ const MailList = ({ mails, currentUserEmail }: Props) => {
                   onClick={() => handleSelect(mail.id)}
                   onMouseEnter={() => handlePrefetch(mail.id)}
                   className={cn(
-                    "flex flex-col gap-1.5 p-4 text-left border-b transition-colors",
-                    isSelected ? "bg-secondary/80" : "hover:bg-secondary/60",
-                    !mail.read && !isSelected && "bg-accent hover:bg-accent/80",
+                    "flex flex-col gap-1 p-4 text-left border-b transition-all duration-200 group",
+                    isSelected 
+                      ? "bg-primary/5 border-l-2 border-l-primary" 
+                      : "hover:bg-muted/50 border-l-2 border-l-transparent",
+                    !mail.read && !isSelected && "bg-muted",
                   )}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex items-start justify-between gap-3 w-full">
+                    {/* Top Row: Name and Date */}
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
                       <span
                         className={cn(
                           "text-sm truncate",
                           !mail.read
-                            ? "font-bold"
+                            ? "font-semibold text-foreground"
                             : "font-medium text-muted-foreground",
                         )}
                       >
-                        {senderName}
+                        {displayName}
                       </span>
-                      {mail.starred && (
-                        <StarIcon className="h-3.5 w-3.5 fill-yellow-500 text-yellow-500 shrink-0" />
-                      )}
                     </div>
-                    <span className="text-xs text-muted-foreground shrink-0 flex items-center gap-2">
-                      {mail.hasAttachments && (
-                        <PaperclipIcon className="h-3 w-3" />
-                      )}
-                      {formatDistanceToNow(new Date(mail.date), {
-                        addSuffix: true,
-                      })}
-                    </span>
+
+                    <div className="flex items-center gap-2 shrink-0 text-xs text-muted-foreground">
+                       {mail.hasAttachments && (
+                         <PaperclipIcon className="h-3 w-3" />
+                       )}
+                       <span>{dateDisplay}</span>
+                    </div>
                   </div>
 
-                  <span
-                    className={cn(
-                      "text-sm truncate",
-                      !mail.read ? "font-semibold" : "text-muted-foreground",
-                    )}
-                  >
-                    {mail.subject}
-                  </span>
+                  {/* Middle Row: Subject */}
+                  <div className="flex items-center justify-between gap-2 mt-0.5">
+                     <span
+                       className={cn(
+                         "text-sm flex-1",
+                         !mail.read ? "font-medium text-foreground" : "text-muted-foreground",
+                       )}
+                     >
+                       {mail.subject}
+                     </span>
+                     {mail.starred && (
+                        <StarIcon className="h-3.5 w-3.5 fill-yellow-500 text-yellow-500 shrink-0" />
+                      )}
+                  </div>
 
-                  <span className="text-xs text-muted-foreground line-clamp-2">
+                  {/* Bottom Row: Preview */}
+                  <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5 font-normal">
                     {mail.preview}
-                  </span>
+                  </div>
                 </button>
               );
             })}
