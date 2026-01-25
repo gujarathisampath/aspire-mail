@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id     String  @id @default(cuid())
+  email  String  @unique
+  name   String?
+  avatar String?
+
+  identities Identity[]
+  contacts   Contact[]
+  folders    Folder[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Identity {
+  id        String  @id @default(cuid())
+  name      String?
+  email     String
+  replyTo   String?
+  bcc       String?
+  signature String?
+  isDefault Boolean @default(false)
+
+  userEmail String
+  user      User   @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Contact {
+  id     String  @id @default(cuid())
+  name   String
+  email  String
+  avatar String?
+
+  userEmail String
+  user      User   @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Folder {
+  id   String  @id @default(cuid())
+  name String
+  icon String?
+
+  userEmail String
+  user      User   @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userEmail, name])
+}

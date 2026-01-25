@@ -6,6 +6,7 @@ import {
   MenuIcon,
   LogOutIcon,
   RefreshCw,
+  SettingsIcon,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,10 +21,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { logoutAction } from "@/lib/actions/auth";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { useQueryClient, useIsFetching } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 const AppHeader = () => {
   const router = useRouter();
@@ -40,9 +42,13 @@ const AppHeader = () => {
   const isGlobalFetching =
     isFetchingMails || isFetchingFolders || isFetchingDetails || isRefreshing;
 
-  useEffect(() => {
-    setSearchQuery(searchParams.get("q") || "");
-  }, [searchParams]);
+  // Sync search query when URL params change (e.g., browser back/forward)
+  // Using a derived value pattern instead of useEffect to avoid cascading renders
+  const urlQuery = searchParams.get("q") || "";
+  if (searchQuery !== urlQuery && document.activeElement?.tagName !== "INPUT") {
+    // Only sync if input is not focused (user not actively typing)
+    setSearchQuery(urlQuery);
+  }
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -128,6 +134,14 @@ const AppHeader = () => {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <Link href="/settings">
+              <DropdownMenuItem
+                className="mb-1"
+              >
+                <SettingsIcon className="mr-2 h-4 w-4" />
+                Settings
+              </DropdownMenuItem>
+            </Link>
             <DropdownMenuItem
               onClick={handleLogout}
               className="bg-destructive/10 focus:bg-destructive/15"
