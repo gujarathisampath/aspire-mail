@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import FolderView from "./folder-view";
 import Loading from "./loading";
 import { getSessionAction } from "@/lib/actions/auth";
-import { getMailsAction } from "@/lib/actions/mail";
+import { getSettings } from "@/lib/actions/user-settings";
 
 interface Props {
   params: Promise<{ folder: string }>;
@@ -15,6 +15,7 @@ export default async function FolderPage({ params, searchParams }: Props) {
   const { id: selectedId, q: query } = await searchParams;
 
   const session = await getSessionAction();
+  const settings = session ? await getSettings() : null;
 
   return (
     <Suspense fallback={<Loading />}>
@@ -23,6 +24,7 @@ export default async function FolderPage({ params, searchParams }: Props) {
         selectedId={selectedId}
         searchQuery={query}
         session={session}
+        smartCategorizationEnabled={settings?.smartCategorizationEnabled ?? false}
       />
     </Suspense>
   );

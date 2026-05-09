@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getMailsAction } from "@/lib/actions/mail";
 import MailList from "@/components/mail/mail-list";
 import MailDisplay from "@/components/mail/mail-display";
+import { InboxTabs } from "@/components/mail/inbox-tabs";
 import { Button } from "@/components/ui/button";
 import { Mail } from "@/lib/types";
 import Loading from "./loading";
@@ -14,6 +15,7 @@ interface Props {
   selectedId?: string;
   searchQuery?: string;
   session: { email: string; name: string } | null;
+  smartCategorizationEnabled: boolean;
 }
 
 const FolderView = ({
@@ -22,6 +24,7 @@ const FolderView = ({
   selectedId,
   searchQuery,
   session,
+  smartCategorizationEnabled,
 }: Props) => {
   const {
     data: mails,
@@ -33,10 +36,11 @@ const FolderView = ({
     queryFn: () => getMailsAction(folder, searchQuery),
     initialData: initialMails,
     refetchInterval: 60000,
-    staleTime: 5 * 60 * 1000, // 5 minutes (user can manual refresh)
+    staleTime: 5 * 60 * 1000,
     placeholderData: (previousData) => previousData,
     enabled: !!session?.email,
   });
+
   if (isLoading && !mails) {
     return <Loading />;
   }
@@ -53,11 +57,15 @@ const FolderView = ({
   }
 
   const selectedMail = mails?.find((m) => m.id === selectedId) || null;
+  const allMails = mails || [];
 
-  return (
+  // Only apply Smart Categorization tabs for the inbox
+  const isInbox = folder.toLowerCase() === "inbox";
+
+  const renderMailPane = (filteredMails: Mail[]) => (
     <div className="flex h-full">
-      <div className="w-[350px] flex-none border-r text-sidebar-foreground">
-        <MailList mails={mails || []} currentUserEmail={session?.email} />
+      <div className="w-87.5 flex-none border-r text-sidebar-foreground">
+        <MailList mails={filteredMails} currentUserEmail={session?.email} />
       </div>
       <div className="flex-1 overflow-hidden">
         <MailDisplay
@@ -67,6 +75,16 @@ const FolderView = ({
       </div>
     </div>
   );
+
+  if (isInbox && !searchQuery && smartCategorizationEnabled) {
+    return (
+      <InboxTabs mails={allMails} enabled={smartCategorizationEnabled}>
+        {(filteredMails) => renderMailPane(filteredMails)}
+      </InboxTabs>
+    );
+  }
+
+  return renderMailPane(allMails);
 };
 
 export default FolderView;

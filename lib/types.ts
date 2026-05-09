@@ -26,6 +26,8 @@ export interface Mail {
   attachments?: Attachment[];
 }
 
+export type MailCategory = "primary" | "promotions" | "social" | "updates";
+
 export interface Folder {
   id: string;
   name: string;

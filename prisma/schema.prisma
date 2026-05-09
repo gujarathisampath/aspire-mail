@@ -12,6 +12,7 @@ model User {
   email  String  @unique
   name   String?
   avatar String?
+  smartCategorizationEnabled Boolean @default(false)
 
   identities Identity[]
   contacts   Contact[]

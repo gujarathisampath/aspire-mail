@@ -34,7 +34,12 @@ export async function getSettings() {
   const identities = await prisma.identity.findMany({ where: { userEmail: user.email }, orderBy: { isDefault: 'desc' } });
   const contacts = await prisma.contact.findMany({ where: { userEmail: user.email } });
 
-  return { folders, identities, contacts };
+  return {
+    folders,
+    identities,
+    contacts,
+    smartCategorizationEnabled: user.smartCategorizationEnabled,
+  };
 }
 
 export async function getDefaultIdentity() {
@@ -256,6 +261,18 @@ export async function setDefaultIdentity(id: string) {
     }),
   ]);
   revalidatePath("/settings");
+}
+
+export async function setSmartCategorizationEnabled(enabled: boolean) {
+  const user = await getUser();
+
+  await prisma.user.update({
+    where: { email: user.email },
+    data: { smartCategorizationEnabled: enabled },
+  });
+
+  revalidatePath("/settings");
+  revalidatePath("/mail");
 }
 
 // ============================================================
