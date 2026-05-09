@@ -55,7 +55,7 @@ export const sendMailAction = async (data: SendMailData) => {
         autoBcc = autoBcc ? `${autoBcc}, ${defaultIdentity.bcc}` : defaultIdentity.bcc;
       }
     }
-  } catch (e) {
+  } catch (_e) {
     // If fetching identity fails, continue with defaults
     console.warn("[SMTP] Could not fetch default identity, using session email");
   }

@@ -2,16 +2,9 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
 
 export const useKeyboardShortcuts = () => {
   const router = useRouter();
-  const queryClient = useQueryClient();
-  const handleRefresh = async () => {
-    await queryClient.invalidateQueries({ queryKey: ["mails"] });
-    setTimeout(() => {
-    }, 1000);
-  };
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (

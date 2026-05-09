@@ -90,7 +90,7 @@ export const getSessionAction = cache(async () => {
       email: data.email,
       name: data.email.split("@")[0],
     };
-  } catch (e) {
+  } catch (_e) {
     return null;
   }
 });

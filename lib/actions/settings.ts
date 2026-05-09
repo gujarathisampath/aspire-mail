@@ -13,7 +13,7 @@ export const getServerSettingsAction = async (): Promise<
 
   try {
     return JSON.parse(settings.value);
-  } catch (e) {
+  } catch (_e) {
     return {};
   }
 };

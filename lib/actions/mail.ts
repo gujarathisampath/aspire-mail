@@ -52,7 +52,7 @@ export const getMailDetailsAction = async (
 ): Promise<{ content: string; attachments: any[] }> => {
   const client = await getImapClient();
   let content = "";
-  let attachments: any[] = [];
+  const attachments: any[] = [];
 
   try {
     await client.connect();
@@ -515,7 +515,7 @@ export const archiveMailAction = async (folderId: string, uid: string) => {
         try {
           await client.mailboxCreate("Archive");
           targetFolder = "Archive";
-        } catch (createErr) {
+        } catch (_createErr) {
           // If creation fails, try INBOX.Archive for some servers
           try {
             await client.mailboxCreate("INBOX.Archive");
@@ -625,5 +625,63 @@ export const saveDraftAction = async (data: {
     return { success: false, error: error.message };
   } finally {
     await client.logout();
+  }
+};
+
+export const createFolderAction = async (name: string) => {
+  const client = await getImapClient();
+  try {
+    await client.connect();
+    await client.mailboxCreate(name);
+    return { success: true };
+  } catch (error: any) {
+    console.error("[IMAP] createFolderAction Error:", error.message);
+    try {
+      await client.mailboxCreate("INBOX." + name);
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  } finally {
+    try { await client.logout(); } catch { client.close(); }
+  }
+};
+
+export const deleteFolderAction = async (name: string) => {
+  const client = await getImapClient();
+  try {
+    await client.connect();
+    const targetFolder = await resolveFolder(client, name);
+    await client.mailboxDelete(targetFolder);
+    return { success: true };
+  } catch (error: any) {
+    console.error("[IMAP] deleteFolderAction Error:", error.message);
+    return { success: false, error: error.message };
+  } finally {
+    try { await client.logout(); } catch { client.close(); }
+  }
+};
+
+export const renameFolderAction = async (oldName: string, newName: string) => {
+  const client = await getImapClient();
+  try {
+    await client.connect();
+    const targetFolder = await resolveFolder(client, oldName);
+    
+    // Guess the path for the new folder based on the old folder's path
+    let newPath = newName;
+    if (targetFolder.includes('.')) {
+      const parts = targetFolder.split('.');
+      parts[parts.length - 1] = newName;
+      newPath = parts.join('.');
+    }
+    
+    await client.mailboxRename(targetFolder, newPath);
+    return { success: true };
+  } catch (error: any) {
+    console.error("[IMAP] renameFolderAction Error:", error.message);
+    return { success: false, error: error.message };
+  } finally {
+    try { await client.logout(); } catch { client.close(); }
   }
 };

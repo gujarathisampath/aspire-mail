@@ -127,7 +127,7 @@ export const useMailActions = ({
   });
 
   const toggleReadMutation = useMutation({
-    mutationFn: ({ seen, silent }: { seen: boolean; silent?: boolean }) =>
+    mutationFn: ({ seen }: { seen: boolean; silent?: boolean }) =>
       toggleReadAction(folderId, mail!.id, seen),
     onMutate: async ({ seen }) => {
       await queryClient.cancelQueries({ queryKey: ["mails", folderId] });

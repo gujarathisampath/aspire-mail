@@ -13,14 +13,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { FOLDER_ICONS } from "./folder-icons";
 
-const STANDARD_FOLDERS = [
-  { slug: "inbox", name: "Inbox" },
-  { slug: "sent", name: "Sent" },
-  { slug: "drafts", name: "Drafts" },
-  { slug: "junk", name: "Junk" },
-  { slug: "trash", name: "Trash" },
-  { slug: "archive", name: "Archive" },
-];
+import { useQuery } from "@tanstack/react-query";
+import { getFoldersAction } from "@/lib/actions/mail";
+import { useAuthStore } from "@/lib/store/auth-store";
 
 interface Props {
   currentFolderId: string;
@@ -35,8 +30,24 @@ export const FolderMoveDropdown = ({
   isSubmenu,
   disabled,
 }: Props) => {
-  const availableFolders = STANDARD_FOLDERS.filter(
-    (f) => f.slug !== currentFolderId.toLowerCase(),
+  const { user } = useAuthStore();
+  const { data: dynamicFolders } = useQuery({
+    queryKey: ["folders", user?.email],
+    queryFn: () => getFoldersAction(),
+    enabled: !!user?.email,
+  });
+
+  const allFolders = dynamicFolders || [
+    { slug: "inbox", name: "Inbox" },
+    { slug: "sent", name: "Sent" },
+    { slug: "drafts", name: "Drafts" },
+    { slug: "junk", name: "Junk" },
+    { slug: "trash", name: "Trash" },
+    { slug: "archive", name: "Archive" },
+  ];
+
+  const availableFolders = allFolders.filter(
+    (f) => f.slug !== currentFolderId.toLowerCase() && f.slug !== "starred",
   );
 
   if (isSubmenu) {

@@ -15,13 +15,13 @@ import {
   LogOutIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  ChevronsUpDown,
+  PlusIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getFoldersAction, getMailsAction } from "@/lib/actions/mail";
+import { getFoldersAction, getMailsAction, createFolderAction, deleteFolderAction, renameFolderAction } from "@/lib/actions/mail";
 import { getSessionAction, logoutAction } from "@/lib/actions/auth";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { useState, useEffect } from "react";
@@ -39,6 +39,23 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 
 const FOLDER_ICONS: Record<string, any> = {
   inbox: InboxIcon,
@@ -65,6 +82,12 @@ const AppSidebar = ({
   const queryClient = useQueryClient();
   const { clearAuth } = useAuthStore();
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
+  const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [isRenameFolderOpen, setIsRenameFolderOpen] = useState(false);
+  const [folderToRename, setFolderToRename] = useState<{oldName: string, newName: string} | null>(null);
+  const [isRenamingFolder, setIsRenamingFolder] = useState(false);
 
   const { data: session } = useQuery({
     queryKey: ["session"],
@@ -128,6 +151,67 @@ const AppSidebar = ({
     if (prefetchTimeout) clearTimeout(prefetchTimeout);
   };
 
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim()) return;
+    setIsCreatingFolder(true);
+    try {
+      const res = await createFolderAction(newFolderName.trim());
+      if (res.success) {
+        toast.success("Folder created successfully");
+        setNewFolderName("");
+        setIsCreateFolderOpen(false);
+        queryClient.invalidateQueries({ queryKey: ["folders"] });
+      } else {
+        toast.error(res.error || "Failed to create folder");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Failed to create folder");
+    } finally {
+      setIsCreatingFolder(false);
+    }
+  };
+
+  const handleDeleteFolder = async (folderSlug: string) => {
+    if (!confirm(`Are you sure you want to delete the folder?`)) return;
+    try {
+      const res = await deleteFolderAction(folderSlug);
+      if (res.success) {
+        toast.success("Folder deleted successfully");
+        queryClient.invalidateQueries({ queryKey: ["folders"] });
+        if (pathname === `/mail/${folderSlug}`) {
+          router.push("/mail/inbox");
+        }
+      } else {
+        toast.error(res.error || "Failed to delete folder");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Failed to delete folder");
+    }
+  };
+
+  const handleRenameFolder = async () => {
+    if (!folderToRename || !folderToRename.newName.trim()) return;
+    setIsRenamingFolder(true);
+    try {
+      const res = await renameFolderAction(folderToRename.oldName, folderToRename.newName.trim());
+      if (res.success) {
+        toast.success("Folder renamed successfully");
+        setIsRenameFolderOpen(false);
+        setFolderToRename(null);
+        queryClient.invalidateQueries({ queryKey: ["folders"] });
+        if (pathname === `/mail/${folderToRename.oldName}`) {
+           router.push("/mail/inbox");
+        }
+      } else {
+        toast.error(res.error || "Failed to rename folder");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Failed to rename folder");
+    } finally {
+      setIsRenamingFolder(false);
+    }
+  };
+
   return (
     <TooltipProvider delayDuration={0}>
       <aside
@@ -162,6 +246,79 @@ const AppSidebar = ({
         <Separator />
 
         {/* Folder Navigation */}
+        <div className="flex items-center justify-between p-2">
+          {!collapsed && (
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-2">
+              Folders
+            </span>
+          )}
+          <Dialog open={isCreateFolderOpen} onOpenChange={setIsCreateFolderOpen}>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="icon" className={cn("h-6 w-6", collapsed && "mx-auto w-full mb-2")}>
+                <PlusIcon className="h-4 w-4" />
+                <span className="sr-only">New Folder</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Create New Folder</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="name">Folder Name</Label>
+                  <Input
+                    id="name"
+                    value={newFolderName}
+                    onChange={(e) => setNewFolderName(e.target.value)}
+                    placeholder="e.g. Work, Personal"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleCreateFolder();
+                    }}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCreateFolderOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleCreateFolder} disabled={!newFolderName.trim() || isCreatingFolder}>
+                  {isCreatingFolder && <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />}
+                  Create
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={isRenameFolderOpen} onOpenChange={setIsRenameFolderOpen}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Rename Folder</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="rename">New Folder Name</Label>
+                  <Input
+                    id="rename"
+                    value={folderToRename?.newName || ""}
+                    onChange={(e) => setFolderToRename(prev => prev ? { ...prev, newName: e.target.value } : null)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleRenameFolder();
+                    }}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsRenameFolderOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleRenameFolder} disabled={!folderToRename?.newName.trim() || isRenamingFolder}>
+                  {isRenamingFolder && <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />}
+                  Rename
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
         <nav className="flex-1 space-y-1 overflow-y-auto p-2">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
@@ -174,24 +331,44 @@ const AppSidebar = ({
               const isActive = pathname.startsWith(href);
               const displayName =
                 folder.slug === "inbox" ? "Inbox" : folder.name;
+              
+              const isSystemFolder = ["inbox", "sent", "drafts", "archive", "junk", "trash", "starred"].includes(folder.slug);
+
+              const FolderButton = (
+                <Button
+                  variant={isActive ? "secondary" : "ghost"}
+                  className={cn(
+                    "w-full justify-start mb-1 gap-2 px-2",
+                    isActive && "font-semibold",
+                    collapsed && "justify-center"
+                  )}
+                  asChild
+                  onMouseEnter={() => handlePrefetch(folder.slug)}
+                  onMouseLeave={clearPrefetch}
+                >
+                  <Link href={href}>
+                    <Icon className="h-4 w-4 shrink-0" />
+                    {!collapsed && (
+                      <>
+                        <span className="truncate flex-1 text-left">
+                          {displayName}
+                        </span>
+                        {folder.unreadCount > 0 && (
+                          <span className="ml-auto text-xs text-muted-foreground">
+                            {folder.unreadCount}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </Link>
+                </Button>
+              );
 
               if (collapsed) {
                 return (
                   <Tooltip key={folder.id}>
                     <TooltipTrigger asChild>
-                      <Button
-                        variant={isActive ? "secondary" : "ghost"}
-                        size="icon"
-                        className="w-full mb-1"
-                        asChild
-                        onMouseEnter={() => handlePrefetch(folder.slug)}
-                        onMouseLeave={clearPrefetch}
-                      >
-                        <Link href={href}>
-                          <Icon className="h-4 w-4" />
-                          <span className="sr-only">{displayName}</span>
-                        </Link>
-                      </Button>
+                      {FolderButton}
                     </TooltipTrigger>
                     <TooltipContent
                       side="right"
@@ -208,30 +385,32 @@ const AppSidebar = ({
                 );
               }
 
+              if (isSystemFolder) {
+                return <div key={folder.id}>{FolderButton}</div>;
+              }
+
               return (
-                <Button
-                  key={folder.id}
-                  variant={isActive ? "secondary" : "ghost"}
-                  className={cn(
-                    "w-full justify-start mb-1 gap-2 px-2",
-                    isActive && "font-semibold",
-                  )}
-                  asChild
-                  onMouseEnter={() => handlePrefetch(folder.slug)}
-                  onMouseLeave={clearPrefetch}
-                >
-                  <Link href={href}>
-                    <Icon className="h-4 w-4 shrink-0" />
-                    <span className="truncate flex-1 text-left">
-                      {displayName}
-                    </span>
-                    {folder.unreadCount > 0 && (
-                      <span className="ml-auto text-xs text-muted-foreground">
-                        {folder.unreadCount}
-                      </span>
-                    )}
-                  </Link>
-                </Button>
+                <ContextMenu key={folder.id}>
+                  <ContextMenuTrigger asChild>
+                    <div>{FolderButton}</div>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    <ContextMenuItem onClick={() => {
+                      setFolderToRename({ oldName: folder.slug, newName: folder.name });
+                      setIsRenameFolderOpen(true);
+                    }}>
+                      <PenSquareIcon className="mr-2 h-4 w-4" />
+                      Rename
+                    </ContextMenuItem>
+                    <ContextMenuItem 
+                      className="text-destructive focus:text-destructive"
+                      onClick={() => handleDeleteFolder(folder.slug)}
+                    >
+                      <Trash2Icon className="mr-2 h-4 w-4" />
+                      Delete
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
               );
             })
           )}
