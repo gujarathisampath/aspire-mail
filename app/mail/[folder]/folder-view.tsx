@@ -8,6 +8,8 @@ import { InboxTabs } from "@/components/mail/inbox-tabs";
 import { Button } from "@/components/ui/button";
 import { Mail } from "@/lib/types";
 import Loading from "./loading";
+import { useSearchParams } from "next/navigation";
+import { buildMailSearchKey, hasMailSearchFilters, readMailSearchFilters } from "@/lib/search";
 
 interface Props {
   folder: string;
@@ -26,14 +28,19 @@ const FolderView = ({
   session,
   smartCategorizationEnabled,
 }: Props) => {
+  const searchParams = useSearchParams();
+  const searchFilters = readMailSearchFilters(searchParams);
+  const searchKey = buildMailSearchKey(searchFilters);
+  const selectedIdFromUrl = searchParams.get("id") || selectedId;
+
   const {
     data: mails,
     isError,
     refetch,
     isLoading,
   } = useQuery({
-    queryKey: ["mails", folder, searchQuery || "", session?.email],
-    queryFn: () => getMailsAction(folder, searchQuery),
+    queryKey: ["mails", folder, searchKey, session?.email],
+    queryFn: () => getMailsAction(folder, searchKey),
     initialData: initialMails,
     refetchInterval: 60000,
     staleTime: 5 * 60 * 1000,
@@ -56,11 +63,12 @@ const FolderView = ({
     );
   }
 
-  const selectedMail = mails?.find((m) => m.id === selectedId) || null;
+  const selectedMail = mails?.find((m) => m.id === selectedIdFromUrl) || null;
   const allMails = mails || [];
 
   // Only apply Smart Categorization tabs for the inbox
   const isInbox = folder.toLowerCase() === "inbox";
+  const hasSearch = hasMailSearchFilters(searchFilters);
 
   const renderMailPane = (filteredMails: Mail[]) => (
     <div className="flex h-full">
@@ -76,7 +84,7 @@ const FolderView = ({
     </div>
   );
 
-  if (isInbox && !searchQuery && smartCategorizationEnabled) {
+  if (isInbox && !hasSearch && smartCategorizationEnabled) {
     return (
       <InboxTabs mails={allMails} enabled={smartCategorizationEnabled}>
         {(filteredMails) => renderMailPane(filteredMails)}

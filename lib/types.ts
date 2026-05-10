@@ -22,8 +22,19 @@ export interface Mail {
   date: string;
   read: boolean;
   starred: boolean;
+  size?: number;
   hasAttachments?: boolean;
   attachments?: Attachment[];
+}
+
+export interface MailSearchFilters {
+  q?: string;
+  from?: string;
+  exact?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  minSize?: string;
+  maxSize?: string;
 }
 
 export type MailCategory = "primary" | "promotions" | "social" | "updates";

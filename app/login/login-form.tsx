@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { useRouter } from "next/navigation";
 import { Loader2Icon } from "lucide-react";
-import { loginAction } from "@/lib/actions/auth";
 import { useMutation } from "@tanstack/react-query";
 import RHFFormProvider from "@/components/hook-form/rhf-form-provider";
 import RHFTextField from "@/components/hook-form/rhf-text-field";
@@ -30,8 +29,17 @@ const LoginForm = () => {
 
   const mutation = useMutation({
     mutationFn: async (data: LoginData) => {
-      const result = await loginAction(data);
-      if (!result.success) {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
         throw new Error(result.error || "Authentication failed.");
       }
       return { ...result, email: data.email };
@@ -58,35 +66,39 @@ const LoginForm = () => {
     <RHFFormProvider
       methods={methods}
       onSubmit={handleSubmit(onSubmit)}
-      className="mt-8 space-y-6"
+      className="space-y-6"
     >
-      <div className="space-y-4">
+      <div className="space-y-5">
         <RHFTextField
           name="email"
-          label="Email"
-          placeholder="name@aspiredev.in"
+          label="Email address"
+          placeholder="you@company.com"
           type="email"
           required
+          autoComplete="email"
+          className="h-11 rounded-lg border border-border bg-background/50 px-4 py-2.5 shadow-sm transition-all placeholder:text-muted-foreground/60 focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary/30"
         />
 
         <RHFPasswordField
           name="password"
           label="Password"
-          placeholder="**************"
+          placeholder="••••••••"
           required
+          autoComplete="current-password"
+          className="h-11 rounded-lg border border-border bg-background/50 px-4 py-2.5 shadow-sm transition-all placeholder:text-muted-foreground/60 focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary/30"
         />
       </div>
 
       <Button
         type="submit"
-        className="w-full py-2 font-medium"
+        className="mt-8 w-full rounded-lg py-6 font-semibold shadow-md transition-all duration-200 hover:shadow-lg hover:brightness-110"
         size={"lg"}
         disabled={mutation.isPending}
       >
         {mutation.isPending ? (
           <Loader2Icon className="h-4 w-4 animate-spin mr-2" />
         ) : null}
-        Sign In
+        Sign in
       </Button>
     </RHFFormProvider>
   );

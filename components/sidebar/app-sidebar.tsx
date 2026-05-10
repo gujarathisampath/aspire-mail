@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getFoldersAction, getMailsAction, createFolderAction, deleteFolderAction, renameFolderAction } from "@/lib/actions/mail";
-import { getSessionAction, logoutAction } from "@/lib/actions/auth";
+import { getSessionAction } from "@/lib/actions/auth";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { useState, useEffect } from "react";
 import {
@@ -130,7 +130,7 @@ const AppSidebar = ({
   }, [prefetchTimeout]);
 
   const logoutMutation = useMutation({
-    mutationFn: () => logoutAction(),
+    mutationFn: () => fetch("/api/auth/logout", { method: "POST" }),
     onSuccess: () => {
       clearAuth();
       queryClient.removeQueries();
@@ -259,7 +259,7 @@ const AppSidebar = ({
                 <span className="sr-only">New Folder</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-106.25">
               <DialogHeader>
                 <DialogTitle>Create New Folder</DialogTitle>
               </DialogHeader>
@@ -290,7 +290,7 @@ const AppSidebar = ({
           </Dialog>
 
           <Dialog open={isRenameFolderOpen} onOpenChange={setIsRenameFolderOpen}>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-106.25">
               <DialogHeader>
                 <DialogTitle>Rename Folder</DialogTitle>
               </DialogHeader>

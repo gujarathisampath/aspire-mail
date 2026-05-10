@@ -91,6 +91,7 @@ export const getSessionAction = cache(async () => {
       name: data.email.split("@")[0],
     };
   } catch (_e) {
+    cookieStore.delete("mail-session");
     return null;
   }
 });

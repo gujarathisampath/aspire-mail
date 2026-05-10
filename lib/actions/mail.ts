@@ -26,7 +26,17 @@ export const getImapClient = async () => {
     throw new Error("No active session. Please log in.");
   }
 
-  const { email, password } = JSON.parse(session.value);
+  let email: string;
+  let password: string;
+
+  try {
+    const parsed = JSON.parse(session.value);
+    email = parsed.email;
+    password = parsed.password;
+  } catch {
+    cookieStore.delete("mail-session");
+    throw new Error("Session is invalid. Please log in again.");
+  }
   const domain = email.split("@")[1];
   const { host, port, secure, rejectUnauthorized } = APP_CONFIG.server.imap;
   const imapHost = host || `mail.${domain}`;
@@ -221,7 +231,7 @@ export const resolveFolder = async (client: ImapFlow, slug: string) => {
 
 const getMails = async (
   folderId: string = "INBOX",
-  query?: string,
+  searchKey?: string,
 ): Promise<Mail[]> => {
   const client = await getImapClient();
   try {
@@ -229,19 +239,75 @@ const getMails = async (
     const targetFolder = await resolveFolder(client, folderId);
     const lock = await client.getMailboxLock(targetFolder);
     const mails: Mail[] = [];
+    const searchParams = new URLSearchParams(searchKey || "");
+    const searchOptions = {
+      q: searchParams.get("q") || "",
+      from: searchParams.get("from") || "",
+      exact: searchParams.get("exact") || "",
+      dateFrom: searchParams.get("dateFrom") || "",
+      dateTo: searchParams.get("dateTo") || "",
+      minSize: searchParams.get("minSize") || "",
+      maxSize: searchParams.get("maxSize") || "",
+    };
 
     try {
       let range: string | number[] = "";
+      const hasSearch = Boolean(
+        searchOptions.q ||
+          searchOptions.from ||
+          searchOptions.exact ||
+          searchOptions.dateFrom ||
+          searchOptions.dateTo ||
+          searchOptions.minSize ||
+          searchOptions.maxSize,
+      );
 
-      if (query && query.trim()) {
-        const searchCriteria = {
-          or: [
-            { subject: query },
-            { from: query },
-            { body: query },
-            { text: query },
-          ],
-        };
+      const searchCriteria: Record<string, unknown> = {};
+
+      if (searchOptions.from) {
+        searchCriteria.from = searchOptions.from;
+      }
+
+      if (searchOptions.dateFrom) {
+        const startDate = new Date(searchOptions.dateFrom);
+        if (!Number.isNaN(startDate.getTime())) {
+          searchCriteria.since = startDate.toISOString().slice(0, 10);
+        }
+      }
+
+      if (searchOptions.dateTo) {
+        const endDate = new Date(searchOptions.dateTo);
+        if (!Number.isNaN(endDate.getTime())) {
+          endDate.setUTCDate(endDate.getUTCDate() + 1);
+          searchCriteria.before = endDate.toISOString().slice(0, 10);
+        }
+      }
+
+      if (searchOptions.minSize) {
+        const minSizeMb = Number(searchOptions.minSize);
+        if (Number.isFinite(minSizeMb) && minSizeMb >= 0) {
+          searchCriteria.larger = Math.max(Math.round(minSizeMb * 1024 * 1024) - 1, 0);
+        }
+      }
+
+      if (searchOptions.maxSize) {
+        const maxSizeMb = Number(searchOptions.maxSize);
+        if (Number.isFinite(maxSizeMb) && maxSizeMb >= 0) {
+          searchCriteria.smaller = Math.round(maxSizeMb * 1024 * 1024) + 1;
+        }
+      }
+
+      const keywordSearch = searchOptions.q || searchOptions.exact;
+      if (keywordSearch) {
+        searchCriteria.or = [
+          { subject: keywordSearch },
+          { from: keywordSearch },
+          { body: keywordSearch },
+          { text: keywordSearch },
+        ];
+      }
+
+      if (hasSearch) {
         const uids = await client.search(searchCriteria, { uid: true });
         // Only take the last 50 matches for performance if there are many
         if (uids && Array.isArray(uids)) {
@@ -266,10 +332,28 @@ const getMails = async (
             flags: true,
             uid: true,
             bodyStructure: true,
+            size: true,
+            source: Boolean(searchOptions.exact),
           },
           { uid: Array.isArray(range) },
         )) {
           if (message.envelope && message.uid) {
+            if (searchOptions.exact) {
+              const exactTerm = searchOptions.exact.toLowerCase();
+              const parsedSource = message.source ? await simpleParser(message.source) : null;
+              const searchableText = [
+                message.envelope.subject || "",
+                parsedSource?.text || "",
+                parsedSource?.html || "",
+              ]
+                .join(" ")
+                .toLowerCase();
+
+              if (!searchableText.includes(exactTerm)) {
+                continue;
+              }
+            }
+
             // Check for attachments in bodyStructure
             let hasAttachments = false;
             if (message.bodyStructure) {
@@ -316,6 +400,7 @@ const getMails = async (
                 new Date().toISOString(),
               read: message.flags?.has("\\Seen") || false,
               starred: message.flags?.has("\\Flagged") || false,
+              size: message.size,
               hasAttachments,
             });
           }
