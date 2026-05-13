@@ -40,6 +40,15 @@ export const sendMailAction = async (data: SendMailData) => {
     return { success: false, error: "Invalid session data." };
   }
 
+  if (
+    typeof sessionData?.email !== "string" ||
+    !sessionData.email.includes("@") ||
+    typeof sessionData?.password !== "string" ||
+    sessionData.password.length === 0
+  ) {
+    return { success: false, error: "Invalid session data shape." };
+  }
+
   const { email, password } = sessionData;
   const domain = email.split("@")[1];
   const { host, port, secure, rejectUnauthorized } = APP_CONFIG.server.smtp;

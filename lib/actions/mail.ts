@@ -30,7 +30,6 @@ export const getImapClient = async () => {
   try {
     sessionData = JSON.parse(session.value);
   } catch (e) {
-    cookieStore.delete("mail-session");
     redirect("/login");
   }
 
@@ -337,6 +336,20 @@ export const downloadAttachmentAction = async (
   return null;
 };
 
+export const invalidateFolderCache = async (client: any) => {
+  client._folderCache = null;
+  const globalAny = global as any;
+  if (globalAny.imapPool) {
+    for (const poolData of globalAny.imapPool.values()) {
+      for (const entry of poolData.connections) {
+        if (entry) {
+          entry.promise.then((c: any) => { if (c) c._folderCache = null; }).catch(() => {});
+        }
+      }
+    }
+  }
+};
+
 export const resolveFolder = async (client: ImapFlow, slug: string) => {
   const normalizedSlug = slug.toLowerCase();
 
@@ -346,7 +359,7 @@ export const resolveFolder = async (client: ImapFlow, slug: string) => {
     (client as any)._folderCache = await client.list();
     // Invalidate cache after 5 minutes
     setTimeout(() => {
-      (client as any)._folderCache = null;
+      invalidateFolderCache(client);
     }, 5 * 60 * 1000);
   }
   
@@ -672,11 +685,13 @@ export const archiveMailAction = async (folderId: string, uid: string) => {
         // Create the Archive folder
         try {
           await client.mailboxCreate("Archive");
+          invalidateFolderCache(client);
           targetFolder = "Archive";
         } catch (_createErr) {
           // If creation fails, try INBOX.Archive for some servers
           try {
             await client.mailboxCreate("INBOX.Archive");
+            invalidateFolderCache(client);
             targetFolder = "INBOX.Archive";
           } catch {
             return {

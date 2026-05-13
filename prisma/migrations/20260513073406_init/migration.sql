@@ -66,3 +66,28 @@ ALTER TABLE "Contact" ADD CONSTRAINT "Contact_userEmail_fkey" FOREIGN KEY ("user
 
 -- AddForeignKey
 ALTER TABLE "Folder" ADD CONSTRAINT "Folder_userEmail_fkey" FOREIGN KEY ("userEmail") REFERENCES "User"("email") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- CreateIndex
+CREATE INDEX "Identity_userEmail_idx" ON "Identity"("userEmail");
+
+-- CreateIndex
+CREATE INDEX "Contact_userEmail_idx" ON "Contact"("userEmail");
+
+-- CreateIndex
+CREATE INDEX "Folder_userEmail_idx" ON "Folder"("userEmail");
+
+-- Cleanup duplicate defaults: set all but the most recently updated default to false
+UPDATE "Identity"
+SET "isDefault" = false
+WHERE "isDefault" = true
+  AND "id" NOT IN (
+    SELECT "id" FROM (
+      SELECT "id", ROW_NUMBER() OVER(PARTITION BY "userEmail" ORDER BY "updatedAt" DESC) as rn
+      FROM "Identity"
+      WHERE "isDefault" = true
+    ) t
+    WHERE t.rn = 1
+  );
+
+-- Create partial unique index
+CREATE UNIQUE INDEX "Identity_userEmail_default_key" ON "Identity"("userEmail") WHERE "isDefault" = true;

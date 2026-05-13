@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getSessionAction } from "./auth";
 import { FolderData, IdentityData, ContactData, folderSchema, identitySchema, contactSchema } from "@/lib/validation/user-settings";
 import { revalidatePath } from "next/cache";
-import { getImapClient } from "./mail";
+import { getImapClient, invalidateFolderCache } from "./mail";
 
 async function getUser() {
   const session = await getSessionAction();
@@ -74,6 +74,7 @@ export async function createFolder(data: FolderData) {
     
     // Try to create the folder on IMAP
     await client.mailboxCreate(valid.name);
+    invalidateFolderCache(client);
     
     // If IMAP creation succeeds, store in local database
     await prisma.folder.create({
@@ -123,6 +124,7 @@ export async function deleteFolder(id: string) {
     
     // Try to delete the folder on IMAP
     await client.mailboxDelete(folder.name);
+    invalidateFolderCache(client);
     
     // If IMAP deletion succeeds, remove from local database
     await prisma.folder.delete({
@@ -163,6 +165,7 @@ export async function updateFolder(id: string, data: Partial<FolderData>) {
       
       // Rename the folder on IMAP
       await client.mailboxRename(folder.name, data.name);
+      invalidateFolderCache(client);
       
       // Update local database
       await prisma.folder.update({
