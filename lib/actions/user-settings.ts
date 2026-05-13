@@ -12,27 +12,25 @@ async function getUser() {
     throw new Error("Unauthorized");
   }
 
-  let user = await prisma.user.findUnique({
+  const user = await prisma.user.upsert({
     where: { email: session.email },
+    update: {},
+    create: {
+      email: session.email,
+      name: session.name || session.email.split("@")[0],
+    },
   });
-
-  if (!user) {
-    user = await prisma.user.create({
-      data: {
-        email: session.email,
-        name: session.name,
-      },
-    });
-  }
   return user;
 }
 
 export async function getSettings() {
   const user = await getUser();
   
-  const folders = await prisma.folder.findMany({ where: { userEmail: user.email } });
-  const identities = await prisma.identity.findMany({ where: { userEmail: user.email }, orderBy: { isDefault: 'desc' } });
-  const contacts = await prisma.contact.findMany({ where: { userEmail: user.email } });
+  const [folders, identities, contacts] = await Promise.all([
+    prisma.folder.findMany({ where: { userEmail: user.email } }),
+    prisma.identity.findMany({ where: { userEmail: user.email }, orderBy: { isDefault: 'desc' } }),
+    prisma.contact.findMany({ where: { userEmail: user.email } })
+  ]);
 
   return {
     folders,

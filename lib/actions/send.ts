@@ -33,7 +33,14 @@ export const sendMailAction = async (data: SendMailData) => {
     return { success: false, error: "No active session." };
   }
 
-  const { email, password } = JSON.parse(session.value);
+  let sessionData: any;
+  try {
+    sessionData = JSON.parse(session.value);
+  } catch (e) {
+    return { success: false, error: "Invalid session data." };
+  }
+
+  const { email, password } = sessionData;
   const domain = email.split("@")[1];
   const { host, port, secure, rejectUnauthorized } = APP_CONFIG.server.smtp;
   const smtpHost = host || `smtp.${domain}`;
