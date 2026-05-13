@@ -26,12 +26,20 @@ export const getImapClient = async () => {
   if (!session) {
     redirect("/login");
   }
-
   let sessionData: any;
   try {
     sessionData = JSON.parse(session.value);
   } catch (e) {
     cookieStore.delete("mail-session");
+    redirect("/login");
+  }
+
+  if (
+    typeof sessionData?.email !== "string" ||
+    !sessionData.email.includes("@") ||
+    typeof sessionData?.password !== "string" ||
+    sessionData.password.length === 0
+  ) {
     redirect("/login");
   }
 
