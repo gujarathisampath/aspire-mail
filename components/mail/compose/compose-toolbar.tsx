@@ -117,8 +117,9 @@ const ComposeToolbar = ({
                     type="button"
                     onClick={onSignature}
                     className="text-muted-foreground hover:text-foreground"
+                    aria-label="Insert signature"
                   >
-                    <PenLineIcon className="h-4 w-4" />
+                    <PenLineIcon className="h-4 w-4" aria-hidden="true" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Insert Signature</TooltipContent>

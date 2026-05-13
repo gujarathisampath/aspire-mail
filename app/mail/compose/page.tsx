@@ -84,7 +84,18 @@ const ComposePage = () => {
   const handleInsertSignature = useCallback(() => {
     if (!editor) return;
     if (defaultIdentity?.signature) {
-      const formattedSignature = `<br/><br/><div class="signature" style="color: #666;">${defaultIdentity.signature.replace(/\n/g, '<br/>')}</div>`;
+      // Escape HTML special characters to prevent XSS
+      const escapeHtml = (str: string) => {
+        return str
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;')
+          .replace(/\//g, '&#x2F;');
+      };
+      const escapedSignature = escapeHtml(defaultIdentity.signature);
+      const formattedSignature = `<br/><br/><div class="signature" style="color: #666;">${escapedSignature.replace(/\n/g, '<br/>')}</div>`;
       editor.chain().focus().insertContent(formattedSignature).run();
       toast.success("Signature added");
     } else {
