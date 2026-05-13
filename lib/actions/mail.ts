@@ -50,7 +50,7 @@ export const getImapClient = async () => {
   // Ensure global pool exists
   const globalAny = global as any;
   if (!globalAny.imapPool) {
-    globalAny.imapPool = new Map<string, { connections: { promise: Promise<ImapFlow>, lastUsed: number }[], nextIdx: number }>();
+    globalAny.imapPool = new Map<string, { connections: { promise: Promise<ImapFlow>, lastUsed: number, inUse: boolean }[], nextIdx: number, waiters: Array<(client: ImapFlow) => void> }>();
   }
   const pool = globalAny.imapPool;
 
@@ -58,9 +58,35 @@ export const getImapClient = async () => {
   let poolData = pool.get(connectionKey);
 
   if (!poolData) {
-    poolData = { connections: [], nextIdx: 0 };
+    poolData = { connections: [], nextIdx: 0, waiters: [] };
     pool.set(connectionKey, poolData);
   }
+
+  const MAX_CONNECTIONS = 3;
+
+  // Helper to release a connection back to the pool
+  const releaseConnection = (entry: any) => {
+    entry.inUse = false;
+    // Check if there's a waiter that can use this connection
+    if (poolData.waiters.length > 0) {
+      const waiter = poolData.waiters.shift();
+      if (waiter) {
+        entry.inUse = true;
+        entry.lastUsed = Date.now();
+        entry.promise.then((client: ImapFlow) => {
+          // Re-override logout/close for the new user
+          client.logout = async () => { releaseConnection(entry); };
+          client.close = () => { releaseConnection(entry); };
+          waiter(client);
+        }).catch(() => {
+          // If the connection is dead, let the waiter retry
+          poolData.connections = poolData.connections.filter((e: any) => e !== entry);
+          // Recursively satisfy the waiter
+          getImapClient().then(waiter).catch(() => {});
+        });
+      }
+    }
+  };
 
   // Try to find a usable connection from the pool using round-robin
   for (let i = 0; i < poolData.connections.length; i++) {
@@ -75,8 +101,8 @@ export const getImapClient = async () => {
         entry.lastUsed = Date.now();
         entry.inUse = true;
 
-        client.logout = async () => { entry.inUse = false; };
-        client.close = () => { entry.inUse = false; };
+        client.logout = async () => { releaseConnection(entry); };
+        client.close = () => { releaseConnection(entry); };
 
         return client;
       }
@@ -89,6 +115,22 @@ export const getImapClient = async () => {
   // Filter out any dead connections
   poolData.connections = poolData.connections.filter(Boolean);
 
+  // If we're at max connections and no idle connection available, enqueue the request
+  if (poolData.connections.length >= MAX_CONNECTIONS) {
+    // Try to evict an idle connection first
+    const evictIdx = poolData.connections.findIndex((e: any) => !e.inUse);
+    if (evictIdx !== -1) {
+      const oldest = poolData.connections.splice(evictIdx, 1)[0];
+      oldest.promise.then((c: any) => c.realLogout?.()).catch(() => {});
+    } else {
+      // No idle connection to evict, must wait
+      return new Promise<ImapFlow>((resolve) => {
+        poolData.waiters.push(resolve);
+      });
+    }
+  }
+
+  // Create a new connection (client is not connected yet)
   const entry: any = { promise: null, lastUsed: Date.now(), inUse: true };
 
   const connectPromise = (async () => {
@@ -106,27 +148,17 @@ export const getImapClient = async () => {
       },
     });
 
-    await client.connect();
-
     const originalLogout = client.logout.bind(client);
-    client.logout = async () => { entry.inUse = false; };
-    client.close = () => { entry.inUse = false; };
+    const originalConnect = client.connect.bind(client);
+    client.logout = async () => { releaseConnection(entry); };
+    client.close = () => { releaseConnection(entry); };
     (client as any).realLogout = originalLogout;
-    client.connect = async () => {}; // no-op if already connected
+    (client as any).realConnect = originalConnect;
     return client;
   })();
 
   entry.promise = connectPromise;
   poolData.connections.push(entry);
-
-  // If we exceed max connections (3), evict the oldest not in use
-  if (poolData.connections.length > 3) {
-    const evictIdx = poolData.connections.findIndex((e: any) => !e.inUse);
-    if (evictIdx !== -1) {
-      const oldest = poolData.connections.splice(evictIdx, 1)[0];
-      oldest.promise.then((c: any) => c.realLogout?.()).catch(() => {});
-    }
-  }
 
   // Clean up idle connections periodically (e.g., every 5 minutes)
   if (!globalAny.imapPoolInterval) {
@@ -164,7 +196,7 @@ export const getMailDetailsAction = async (
   const attachments: any[] = [];
 
   try {
-    await client.connect();
+    await (client as any).realConnect();
     const targetFolder = await resolveFolder(client, folderId);
     const lock = await client.getMailboxLock(targetFolder);
 
@@ -272,7 +304,7 @@ export const downloadAttachmentAction = async (
 ) => {
   const client = await getImapClient();
   try {
-    await client.connect();
+    await (client as any).realConnect();
     const targetFolder = await resolveFolder(client, folderId);
     const lock = await client.getMailboxLock(targetFolder);
 
@@ -403,7 +435,7 @@ const getMails = async (
 ): Promise<Mail[]> => {
   const client = await getImapClient();
   try {
-    await client.connect();
+    await (client as any).realConnect();
     const targetFolder = await resolveFolder(client, folderId);
     const lock = await client.getMailboxLock(targetFolder);
     const mails: Mail[] = [];
@@ -447,7 +479,7 @@ const getMails = async (
           { uid: Array.isArray(range) },
         )) {
           if (message.envelope && message.uid) {
-            let hasAttachments = false;
+            const hasAttachments = false;
 
             const cleanName = (name?: string) => {
               if (!name) return "";
@@ -509,7 +541,7 @@ export const getMailsAction = cache(getMails);
 const getFolders = async (): Promise<Folder[]> => {
   const client = await getImapClient();
   try {
-    await client.connect();
+    await (client as any).realConnect();
     if (!(client as any)._folderCache) {
       (client as any)._folderCache = await client.list();
       setTimeout(() => {
@@ -616,7 +648,7 @@ export const getFoldersAction = cache(getFolders);
 export const deleteMailAction = async (folderId: string, uid: string) => {
   const client = await getImapClient();
   try {
-    await client.connect();
+    await (client as any).realConnect();
     const targetFolder = await resolveFolder(client, folderId);
     const lock = await client.getMailboxLock(targetFolder);
     try {
@@ -641,7 +673,7 @@ export const toggleReadAction = async (
 ) => {
   const client = await getImapClient();
   try {
-    await client.connect();
+    await (client as any).realConnect();
     const targetFolder = await resolveFolder(client, folderId);
     const lock = await client.getMailboxLock(targetFolder);
     try {
@@ -665,7 +697,7 @@ export const toggleReadAction = async (
 export const archiveMailAction = async (folderId: string, uid: string) => {
   const client = await getImapClient();
   try {
-    await client.connect();
+    await (client as any).realConnect();
     const sourceFolder = await resolveFolder(client, folderId);
 
     // Try to resolve archive folder, create if doesn't exist
@@ -726,7 +758,7 @@ export const moveMailAction = async (
 ) => {
   const client = await getImapClient();
   try {
-    await client.connect();
+    await (client as any).realConnect();
     const sourceFolder = await resolveFolder(client, folderId);
     const targetFolder = await resolveFolder(client, targetFolderSlug);
 
@@ -752,7 +784,7 @@ export const toggleStarAction = async (
 ) => {
   const client = await getImapClient();
   try {
-    await client.connect();
+    await (client as any).realConnect();
     const targetFolder = await resolveFolder(client, folderId);
     const lock = await client.getMailboxLock(targetFolder);
     try {
@@ -780,7 +812,7 @@ export const saveDraftAction = async (data: {
 }) => {
   const client = await getImapClient();
   try {
-    await client.connect();
+    await (client as any).realConnect();
     const draftsFolder = await resolveFolder(client, "drafts");
 
     const mailOptions = {
@@ -804,7 +836,7 @@ export const saveDraftAction = async (data: {
 export const createFolderAction = async (name: string) => {
   const client = await getImapClient();
   try {
-    await client.connect();
+    await (client as any).realConnect();
     await client.mailboxCreate(name);
     return { success: true };
   } catch (error: any) {
@@ -823,7 +855,7 @@ export const createFolderAction = async (name: string) => {
 export const deleteFolderAction = async (name: string) => {
   const client = await getImapClient();
   try {
-    await client.connect();
+    await (client as any).realConnect();
     const targetFolder = await resolveFolder(client, name);
     await client.mailboxDelete(targetFolder);
     return { success: true };
@@ -838,7 +870,7 @@ export const deleteFolderAction = async (name: string) => {
 export const renameFolderAction = async (oldName: string, newName: string) => {
   const client = await getImapClient();
   try {
-    await client.connect();
+    await (client as any).realConnect();
     const targetFolder = await resolveFolder(client, oldName);
     
     // Guess the path for the new folder based on the old folder's path
