@@ -60,13 +60,18 @@ export const getImapClient = async () => {
   for (let i = 0; i < poolData.connections.length; i++) {
     const idx = (poolData.nextIdx + i) % poolData.connections.length;
     const entry = poolData.connections[idx];
-    if (!entry) continue;
+    if (!entry || entry.inUse) continue;
 
     try {
       const client = await entry.promise;
       if (client.usable) {
         poolData.nextIdx = (idx + 1) % poolData.connections.length;
         entry.lastUsed = Date.now();
+        entry.inUse = true;
+
+        client.logout = async () => { entry.inUse = false; };
+        client.close = () => { entry.inUse = false; };
+
         return client;
       }
     } catch (e) {
@@ -78,7 +83,8 @@ export const getImapClient = async () => {
   // Filter out any dead connections
   poolData.connections = poolData.connections.filter(Boolean);
 
-  // If no usable connection found or we can spawn more concurrent lines (max 3)
+  const entry: any = { promise: null, lastUsed: Date.now(), inUse: true };
+
   const connectPromise = (async () => {
     const client = new ImapFlow({
       host: imapHost,
@@ -97,19 +103,21 @@ export const getImapClient = async () => {
     await client.connect();
 
     const originalLogout = client.logout.bind(client);
-    client.logout = async () => {};
-    client.close = () => {};
+    client.logout = async () => { entry.inUse = false; };
+    client.close = () => { entry.inUse = false; };
     (client as any).realLogout = originalLogout;
     client.connect = async () => {}; // no-op if already connected
     return client;
   })();
 
-  poolData.connections.push({ promise: connectPromise, lastUsed: Date.now() });
+  entry.promise = connectPromise;
+  poolData.connections.push(entry);
 
-  // If we exceed max connections (3), evict the oldest
+  // If we exceed max connections (3), evict the oldest not in use
   if (poolData.connections.length > 3) {
-    const oldest = poolData.connections.shift();
-    if (oldest) {
+    const evictIdx = poolData.connections.findIndex((e: any) => !e.inUse);
+    if (evictIdx !== -1) {
+      const oldest = poolData.connections.splice(evictIdx, 1)[0];
       oldest.promise.then((c: any) => c.realLogout?.()).catch(() => {});
     }
   }
@@ -120,7 +128,7 @@ export const getImapClient = async () => {
       const now = Date.now();
       for (const [key, pd] of pool.entries()) {
         pd.connections = pd.connections.filter((entry: any) => {
-          if (now - entry.lastUsed > 5 * 60 * 1000) {
+          if (!entry.inUse && now - entry.lastUsed > 5 * 60 * 1000) {
             entry.promise.then((c: any) => {
               try {
                 if (typeof c.realLogout === 'function') c.realLogout();
