@@ -175,12 +175,13 @@ export const getMailDetailsAction = async (
               id: part.part || part.id,
               filename:
                 part.parameters?.filename || part.parameters?.name || "unnamed",
-              contentType: part.type || "application/octet-stream",
+              contentType:
+                part.contentType || part.type || "application/octet-stream",
               size: part.size,
-              contentId: part.id,
+              contentId: part.contentId || part.id,
             });
           } else {
-            const type = (part.type || "").toLowerCase();
+            const type = (part.contentType || part.type || "").toLowerCase();
             if (type === "text/html" && !htmlPart) htmlPart = part;
             if (type === "text/plain" && !textPart) textPart = part;
           }
@@ -192,7 +193,15 @@ export const getMailDetailsAction = async (
         findParts(structureMessage.bodyStructure);
 
         const targetPart = htmlPart || textPart;
-        const partId = targetPart?.part || (structureMessage.bodyStructure.type?.toLowerCase().startsWith("text/") ? "1" : null);
+        const partId =
+          targetPart?.part ||
+          ((structureMessage.bodyStructure.contentType ||
+            structureMessage.bodyStructure.type ||
+            "")
+            .toLowerCase()
+            .startsWith("text/")
+            ? "1"
+            : null);
 
         if (targetPart && partId) {
           // Fetch ONLY the text part to skip heavy attachments
@@ -207,7 +216,7 @@ export const getMailDetailsAction = async (
             if (rawContent) {
               const charset = targetPart.parameters?.charset || "utf-8";
               const encoding = targetPart.encoding || "7bit";
-              const fakeHeader = `Content-Type: ${targetPart.type || "text/plain"}; charset="${charset}"\r\nContent-Transfer-Encoding: ${encoding}\r\n\r\n`;
+              const fakeHeader = `Content-Type: ${targetPart.contentType || targetPart.type || "text/plain"}; charset="${charset}"\r\nContent-Transfer-Encoding: ${encoding}\r\n\r\n`;
               const fakeSource = Buffer.concat([
                 Buffer.from(fakeHeader),
                 rawContent,
