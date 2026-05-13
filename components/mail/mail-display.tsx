@@ -30,6 +30,8 @@ const MailDisplay = ({ mail, currentUserEmail }: Props) => {
     queryFn: () => getMailDetailsAction(folderId, mail!.id),
     enabled: !!mail,
     staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { toggleReadMutation } = useMailActions({ mail, folderId, currentUserEmail });
