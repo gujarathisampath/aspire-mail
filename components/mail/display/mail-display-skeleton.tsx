@@ -4,7 +4,7 @@ import { MailContentSkeleton } from "./mail-content-skeleton";
 export const MailDisplaySkeleton = () => {
   return (
     <div className="flex h-full flex-col bg-background">
-      <div className="flex items-center justify-between px-4 border-b shrink-0 h-14 bg-muted/10">
+      <div className="flex items-center justify-between px-4 border-b shrink-0 h-14 bg-background">
         <div className="flex items-center gap-1">
           {Array.from({ length: 6 }).map((_, index) => (
             <Skeleton key={index} className="h-9 w-9 rounded-md" />
@@ -20,7 +20,7 @@ export const MailDisplaySkeleton = () => {
 
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-5xl px-6 md:px-8 py-6 space-y-6">
-          <div className="space-y-3">
+          <div className="space-y-3 border-b pb-4">
             <Skeleton className="h-8 w-4/5 max-w-3xl" />
             <div className="flex flex-wrap items-center gap-3">
               <Skeleton className="h-4 w-10" />
@@ -29,23 +29,17 @@ export const MailDisplaySkeleton = () => {
             </div>
           </div>
 
-          <div className="rounded-2xl border bg-card/70 p-5 shadow-sm">
-            <div className="flex items-start justify-between gap-4 border-b pb-4">
-              <div className="flex items-start gap-3 min-w-0 flex-1">
-                <Skeleton className="h-10 w-10 rounded-full shrink-0" />
-                <div className="flex flex-col gap-2 min-w-0 flex-1">
-                  <Skeleton className="h-4 w-44" />
-                  <Skeleton className="h-3 w-72 max-w-full" />
-                  <Skeleton className="h-3 w-48" />
-                </div>
-              </div>
-              <Skeleton className="h-4 w-20 shrink-0" />
+          <div className="flex items-start gap-3">
+            <Skeleton className="h-10 w-10 rounded-full shrink-0" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-44" />
+              <Skeleton className="h-3 w-72 max-w-full" />
+              <Skeleton className="h-3 w-48" />
             </div>
-
-            <div className="pt-5">
-              <MailContentSkeleton />
-            </div>
+            <Skeleton className="h-4 w-20 shrink-0" />
           </div>
+
+          <MailContentSkeleton />
         </div>
       </div>
 

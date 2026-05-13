@@ -45,6 +45,12 @@ const MailList = ({ mails, currentUserEmail }: Props) => {
   };
 
   const handleSelect = (id: string) => {
+    queryClient.prefetchQuery({
+      queryKey: ["mail-details", folderId, id, currentUserEmail],
+      queryFn: () => getMailDetailsAction(folderId, id),
+      staleTime: 30 * 60 * 1000,
+    });
+
     const params = new URLSearchParams(searchParams.toString());
     params.set("id", id);
     router.replace(`${pathname}?${params.toString()}`);

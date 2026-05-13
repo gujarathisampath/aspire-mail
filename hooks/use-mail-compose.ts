@@ -21,10 +21,10 @@ export const useMailCompose = ({
   const router = useRouter();
 
   const { data, isLoading: isContentLoading } = useQuery({
-    queryKey: ["mail-details", folderId, mail?.id],
+    queryKey: ["mail-details", folderId, mail?.id, currentUserEmail],
     queryFn: () => getMailDetailsAction(folderId, mail!.id),
     enabled: !!mail?.id,
-    staleTime: Infinity,
+    staleTime: 30 * 60 * 1000,
   });
 
   const mailContent = data?.content || mail?.content || "";

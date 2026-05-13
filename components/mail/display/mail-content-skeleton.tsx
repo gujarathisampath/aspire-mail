@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 export const MailContentSkeleton = () => {
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border bg-background p-5 md:p-6 shadow-sm space-y-4">
+      <div className="space-y-4">
         <div className="space-y-3">
           <Skeleton className="h-4 w-2/3" />
           <Skeleton className="h-4 w-1/2" />
@@ -28,11 +28,11 @@ export const MailContentSkeleton = () => {
         </div>
       </div>
 
-      <div className="rounded-2xl border bg-muted/20 p-5 space-y-3">
+      <div className="space-y-3 border-t pt-4">
         <Skeleton className="h-4 w-32" />
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, index) => (
-            <div key={index} className="rounded-xl border bg-background p-3 space-y-3 shadow-sm">
+            <div key={index} className="rounded-lg border p-3 space-y-3">
               <div className="flex items-center gap-3">
                 <Skeleton className="h-10 w-10 rounded-md shrink-0" />
                 <div className="flex-1 space-y-2">

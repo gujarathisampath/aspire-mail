@@ -25,7 +25,7 @@ const MailDisplay = ({ mail, currentUserEmail }: Props) => {
   const rawFolder = (params.folder as string) || "INBOX";
   const folderId = decodeURIComponent(rawFolder);
 
-  const { data: details, isLoading } = useQuery({
+  const { data: details, isFetching } = useQuery({
     queryKey: ["mail-details", folderId, mail?.id, currentUserEmail],
     queryFn: () => getMailDetailsAction(folderId, mail!.id),
     enabled: !!mail,
@@ -45,7 +45,7 @@ const MailDisplay = ({ mail, currentUserEmail }: Props) => {
     return <MailDisplayEmpty />;
   }
 
-  if (isLoading && !details) {
+  if (isFetching || !details) {
     return <MailDisplaySkeleton />;
   }
 
