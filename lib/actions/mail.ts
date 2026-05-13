@@ -154,6 +154,16 @@ export const getImapClient = async () => {
     client.close = () => { releaseConnection(entry); };
     (client as any).realLogout = originalLogout;
     (client as any).realConnect = originalConnect;
+
+    let hasConnected = false;
+    let connectTask: Promise<any> | null = null;
+    client.connect = async () => {
+      if (hasConnected && connectTask) return connectTask;
+      hasConnected = true;
+      connectTask = originalConnect();
+      return connectTask;
+    };
+
     return client;
   })();
 
@@ -196,7 +206,7 @@ export const getMailDetailsAction = async (
   const attachments: any[] = [];
 
   try {
-    await (client as any).realConnect();
+    await client.connect();
     const targetFolder = await resolveFolder(client, folderId);
     const lock = await client.getMailboxLock(targetFolder);
 
@@ -304,7 +314,7 @@ export const downloadAttachmentAction = async (
 ) => {
   const client = await getImapClient();
   try {
-    await (client as any).realConnect();
+    await client.connect();
     const targetFolder = await resolveFolder(client, folderId);
     const lock = await client.getMailboxLock(targetFolder);
 
@@ -435,7 +445,7 @@ const getMails = async (
 ): Promise<Mail[]> => {
   const client = await getImapClient();
   try {
-    await (client as any).realConnect();
+    await client.connect();
     const targetFolder = await resolveFolder(client, folderId);
     const lock = await client.getMailboxLock(targetFolder);
     const mails: Mail[] = [];
@@ -541,7 +551,7 @@ export const getMailsAction = cache(getMails);
 const getFolders = async (): Promise<Folder[]> => {
   const client = await getImapClient();
   try {
-    await (client as any).realConnect();
+    await client.connect();
     if (!(client as any)._folderCache) {
       (client as any)._folderCache = await client.list();
       setTimeout(() => {
@@ -648,7 +658,7 @@ export const getFoldersAction = cache(getFolders);
 export const deleteMailAction = async (folderId: string, uid: string) => {
   const client = await getImapClient();
   try {
-    await (client as any).realConnect();
+    await client.connect();
     const targetFolder = await resolveFolder(client, folderId);
     const lock = await client.getMailboxLock(targetFolder);
     try {
@@ -673,7 +683,7 @@ export const toggleReadAction = async (
 ) => {
   const client = await getImapClient();
   try {
-    await (client as any).realConnect();
+    await client.connect();
     const targetFolder = await resolveFolder(client, folderId);
     const lock = await client.getMailboxLock(targetFolder);
     try {
@@ -697,7 +707,7 @@ export const toggleReadAction = async (
 export const archiveMailAction = async (folderId: string, uid: string) => {
   const client = await getImapClient();
   try {
-    await (client as any).realConnect();
+    await client.connect();
     const sourceFolder = await resolveFolder(client, folderId);
 
     // Try to resolve archive folder, create if doesn't exist
@@ -758,7 +768,7 @@ export const moveMailAction = async (
 ) => {
   const client = await getImapClient();
   try {
-    await (client as any).realConnect();
+    await client.connect();
     const sourceFolder = await resolveFolder(client, folderId);
     const targetFolder = await resolveFolder(client, targetFolderSlug);
 
@@ -784,7 +794,7 @@ export const toggleStarAction = async (
 ) => {
   const client = await getImapClient();
   try {
-    await (client as any).realConnect();
+    await client.connect();
     const targetFolder = await resolveFolder(client, folderId);
     const lock = await client.getMailboxLock(targetFolder);
     try {
@@ -812,7 +822,7 @@ export const saveDraftAction = async (data: {
 }) => {
   const client = await getImapClient();
   try {
-    await (client as any).realConnect();
+    await client.connect();
     const draftsFolder = await resolveFolder(client, "drafts");
 
     const mailOptions = {
@@ -836,7 +846,7 @@ export const saveDraftAction = async (data: {
 export const createFolderAction = async (name: string) => {
   const client = await getImapClient();
   try {
-    await (client as any).realConnect();
+    await client.connect();
     await client.mailboxCreate(name);
     return { success: true };
   } catch (error: any) {
@@ -855,7 +865,7 @@ export const createFolderAction = async (name: string) => {
 export const deleteFolderAction = async (name: string) => {
   const client = await getImapClient();
   try {
-    await (client as any).realConnect();
+    await client.connect();
     const targetFolder = await resolveFolder(client, name);
     await client.mailboxDelete(targetFolder);
     return { success: true };
@@ -870,7 +880,7 @@ export const deleteFolderAction = async (name: string) => {
 export const renameFolderAction = async (oldName: string, newName: string) => {
   const client = await getImapClient();
   try {
-    await (client as any).realConnect();
+    await client.connect();
     const targetFolder = await resolveFolder(client, oldName);
     
     // Guess the path for the new folder based on the old folder's path
