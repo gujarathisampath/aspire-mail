@@ -2,6 +2,7 @@
 
 import { ImapFlow } from "imapflow";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { cache } from "react";
 import { Mail, Folder } from "@/lib/types";
 import { APP_CONFIG } from "@/lib/config";
@@ -17,8 +18,6 @@ export const buildMimeSource = async (mailOptions: any): Promise<Buffer> => {
     });
   });
 };
-
-import { redirect } from "next/navigation";
 
 export const getImapClient = async () => {
   const cookieStore = await cookies();
