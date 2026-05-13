@@ -9,14 +9,9 @@ import {
   FileSpreadsheetIcon,
   FileArchiveIcon,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import {
-  getMailDetailsAction,
-  downloadAttachmentAction,
-} from "@/lib/actions/mail";
+import { downloadAttachmentAction } from "@/lib/actions/mail";
 import { Mail, Attachment } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +21,8 @@ interface Props {
   mail: Mail;
   folderId: string;
   currentUserEmail: string;
+  content?: string;
+  attachments?: Attachment[];
 }
 
 // ----------------------------------------------------------------------
@@ -87,15 +84,13 @@ const getFileInfo = (contentType: string, filename: string) => {
 
 // ----------------------------------------------------------------------
 
-export const MailDisplayContent = ({ mail, folderId, currentUserEmail }: Props) => {
-  const { data, isLoading } = useQuery({
-    queryKey: ["mail-details", folderId, mail.id, currentUserEmail],
-    queryFn: () => getMailDetailsAction(folderId, mail.id),
-    staleTime: 30 * 60 * 1000, // 30 minutes for individual mail content
-  });
-
-  const content = data?.content;
-  const attachments = data?.attachments as Attachment[] | undefined;
+export const MailDisplayContent = ({
+  mail,
+  folderId,
+  currentUserEmail,
+  content,
+  attachments,
+}: Props) => {
   const hasAttachments = attachments && attachments.length > 0;
 
   const handleDownload = async (attachmentId: string, filename: string) => {
@@ -133,27 +128,93 @@ export const MailDisplayContent = ({ mail, folderId, currentUserEmail }: Props) 
     });
   };
 
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className="flex flex-col px-6 md:px-8 space-y-3 ml-13">
-        <Skeleton className="h-4 w-3/4" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-5/6" />
-        <Skeleton className="h-4 w-2/3" />
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col pl-13">
       {/* Email Body */}
       <div className="px-6 md:px-8 pb-6">
         {content ? (
-          <div
-            className="prose prose-sm max-w-none dark:prose-invert prose-a:text-primary prose-img:rounded-md"
-            dangerouslySetInnerHTML={{ __html: content }}
-          />
+          <div className="bg-white rounded-md overflow-hidden border border-border/50">
+            <iframe
+              title="Mail Content"
+              srcDoc={`<style>
+                body {
+                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                  font-size: 14px;
+                  line-height: 1.6;
+                  color: #333;
+                  margin: 0;
+                  padding: 16px;
+                  word-wrap: break-word;
+                }
+                h1, h2, h3, h4, h5, h6 { margin-top: 24px; margin-bottom: 16px; font-weight: 600; line-height: 1.25; }
+                h1 { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: .3em; }
+                h2 { font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: .3em; }
+                h3 { font-size: 1.25em; }
+                h4 { font-size: 1em; }
+                h5 { font-size: 0.875em; }
+                h6 { font-size: 0.85em; color: #6a737d; }
+                p, blockquote, ul, ol, dl, table, pre, details { margin-top: 0; margin-bottom: 16px; }
+                a { color: #0366d6; text-decoration: none; }
+                a:hover { text-decoration: underline; }
+                ul, ol { padding-left: 2em; }
+                ul ul, ul ol, ol ol, ol ul { margin-top: 0; margin-bottom: 0; }
+                li > p { margin-top: 16px; }
+                li + li { margin-top: 0.25em; }
+                blockquote { border-left: 4px solid #dfe2e5; color: #6a737d; padding: 0 1em; margin-left: 0; }
+                code {
+                  background-color: rgba(27,31,35,0.05);
+                  border-radius: 3px;
+                  font-size: 85%;
+                  margin: 0;
+                  padding: 0.2em 0.4em;
+                  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+                }
+                pre {
+                  background-color: #f6f8fa;
+                  border-radius: 3px;
+                  font-size: 85%;
+                  line-height: 1.45;
+                  overflow: auto;
+                  padding: 16px;
+                }
+                pre code { background-color: transparent; border: 0; display: inline; margin: 0; padding: 0; word-wrap: normal; }
+                img { max-width: 100%; box-sizing: content-box; border-style: none; }
+                hr { box-sizing: content-box; height: 0.25em; margin: 24px 0; background-color: #e1e4e8; border: 0; padding: 0; }
+                table { border-collapse: collapse; width: 100%; }
+                table th, table td { border: 1px solid #dfe2e5; padding: 6px 13px; }
+                table tr:nth-child(2n) { background-color: #f6f8fa; }
+              </style>${content}`}
+              sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+              className="w-full min-h-75"
+              style={{ border: "none" }}
+              onLoad={(e) => {
+                const iframe = e.target as HTMLIFrameElement;
+                if (iframe.contentWindow) {
+                  try {
+                    const adjustHeight = () => {
+                      if (iframe.contentWindow?.document.body) {
+                        iframe.style.height = '0px';
+                        const scrollHeight = iframe.contentWindow.document.documentElement.scrollHeight;
+                        iframe.style.height = `${Math.max(300, scrollHeight)}px`;
+                        
+                        const links = iframe.contentWindow.document.querySelectorAll('a');
+                        links.forEach((link: HTMLAnchorElement) => {
+                          link.setAttribute('target', '_blank');
+                          link.setAttribute('rel', 'noopener noreferrer');
+                        });
+                      }
+                    };
+                    
+                    adjustHeight();
+                    setTimeout(adjustHeight, 500);
+                    setTimeout(adjustHeight, 2000);
+                  } catch (err) {
+                    console.error("Error adjusting iframe height", err);
+                  }
+                }
+              }}
+            />
+          </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
             <FileTextIcon className="h-12 w-12 mb-4 opacity-20" />

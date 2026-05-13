@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { logoutAction } from "@/lib/actions/auth";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { useQueryClient, useIsFetching } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
@@ -42,13 +42,13 @@ const AppHeader = () => {
   const isGlobalFetching =
     isFetchingMails || isFetchingFolders || isFetchingDetails || isRefreshing;
 
-  // Sync search query when URL params change (e.g., browser back/forward)
-  // Using a derived value pattern instead of useEffect to avoid cascading renders
+  // Sync search query when URL params change without mutating state during render
   const urlQuery = searchParams.get("q") || "";
-  if (searchQuery !== urlQuery && document.activeElement?.tagName !== "INPUT") {
-    // Only sync if input is not focused (user not actively typing)
+  useEffect(() => {
+    if (searchQuery === urlQuery) return;
+    if (document.activeElement?.tagName === "INPUT") return;
     setSearchQuery(urlQuery);
-  }
+  }, [searchQuery, urlQuery]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

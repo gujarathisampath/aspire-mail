@@ -37,7 +37,6 @@ const FolderView = ({
     initialData: initialMails,
     refetchInterval: 60000,
     staleTime: 5 * 60 * 1000,
-    placeholderData: (previousData) => previousData,
     enabled: !!session?.email,
   });
 

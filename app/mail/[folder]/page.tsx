@@ -10,7 +10,7 @@ interface Props {
   searchParams: Promise<{ id?: string; q?: string }>;
 }
 
-export default async function FolderPage({ params, searchParams }: Props) {
+async function FolderPageContent({ params, searchParams }: Props) {
   const { folder: rawFolder } = await params;
   const folder = decodeURIComponent(rawFolder);
   const { id: selectedId, q: query } = await searchParams;
@@ -39,6 +39,14 @@ export default async function FolderPage({ params, searchParams }: Props) {
         session={session}
         smartCategorizationEnabled={settings?.smartCategorizationEnabled ?? false}
       />
+    </Suspense>
+  );
+}
+
+export default function FolderPage(props: Props) {
+  return (
+    <Suspense fallback={<Loading />}>
+      <FolderPageContent {...props} />
     </Suspense>
   );
 }

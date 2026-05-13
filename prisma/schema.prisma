@@ -23,13 +23,13 @@ model User {
 }
 
 model Identity {
-  id        String  @id @default(cuid())
-  name      String?
-  email     String
-  replyTo   String?
-  bcc       String?
-  signature String?
-  isDefault Boolean @default(false)
+  id             String  @id @default(cuid())
+  name           String?
+  email          String
+  replyTo        String?
+  bcc            String?
+  signature      String?
+  isDefault      Boolean @default(false)
 
   userEmail String
   user      User   @relation(fields: [userEmail], references: [email], onDelete: Cascade)
@@ -66,6 +66,6 @@ model Folder {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([userEmail])
   @@unique([userEmail, name])
+  @@index([userEmail])
 }
