@@ -25,6 +25,8 @@ export const useMailCompose = ({
     queryFn: () => getMailDetailsAction(folderId, mail!.id),
     enabled: !!mail?.id,
     staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const mailContent = data?.content || mail?.content || "";

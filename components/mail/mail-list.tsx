@@ -36,20 +36,26 @@ const MailList = ({ mails, currentUserEmail }: Props) => {
   const query = searchParams.get("q") || "";
   const [filter, setFilter] = useState<FilterType>("all");
 
+  const mailDetailsKey = (uid: string) =>
+    ["mail-details", folderId, uid, currentUserEmail] as const;
+
   const handlePrefetch = (uid: string) => {
+    const queryKey = mailDetailsKey(uid);
+
+    if (queryClient.getQueryData(queryKey)) {
+      return;
+    }
+
     queryClient.prefetchQuery({
-      queryKey: ["mail-details", folderId, uid, currentUserEmail],
+      queryKey,
       queryFn: () => getMailDetailsAction(folderId, uid),
-      staleTime: Infinity,
+      staleTime: 30 * 60 * 1000,
+      gcTime: 60 * 60 * 1000,
     });
   };
 
   const handleSelect = (id: string) => {
-    queryClient.prefetchQuery({
-      queryKey: ["mail-details", folderId, id, currentUserEmail],
-      queryFn: () => getMailDetailsAction(folderId, id),
-      staleTime: 30 * 60 * 1000,
-    });
+    handlePrefetch(id);
 
     const params = new URLSearchParams(searchParams.toString());
     params.set("id", id);
