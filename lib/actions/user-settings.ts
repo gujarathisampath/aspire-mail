@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getSessionAction } from "./auth";
 import { FolderData, IdentityData, ContactData, folderSchema, identitySchema, contactSchema } from "@/lib/validation/user-settings";
 import { revalidatePath } from "next/cache";
-import { getImapClient } from "./mail";
+import { getImapClient, invalidateFolderCache } from "./mail";
 
 async function getUser() {
   const session = await getSessionAction();
@@ -12,27 +12,25 @@ async function getUser() {
     throw new Error("Unauthorized");
   }
 
-  let user = await prisma.user.findUnique({
+  const user = await prisma.user.upsert({
     where: { email: session.email },
+    update: {},
+    create: {
+      email: session.email,
+      name: session.name || session.email.split("@")[0],
+    },
   });
-
-  if (!user) {
-    user = await prisma.user.create({
-      data: {
-        email: session.email,
-        name: session.name,
-      },
-    });
-  }
   return user;
 }
 
 export async function getSettings() {
   const user = await getUser();
   
-  const folders = await prisma.folder.findMany({ where: { userEmail: user.email } });
-  const identities = await prisma.identity.findMany({ where: { userEmail: user.email }, orderBy: { isDefault: 'desc' } });
-  const contacts = await prisma.contact.findMany({ where: { userEmail: user.email } });
+  const [folders, identities, contacts] = await Promise.all([
+    prisma.folder.findMany({ where: { userEmail: user.email } }),
+    prisma.identity.findMany({ where: { userEmail: user.email }, orderBy: { isDefault: 'desc' } }),
+    prisma.contact.findMany({ where: { userEmail: user.email } })
+  ]);
 
   return {
     folders,
@@ -76,6 +74,7 @@ export async function createFolder(data: FolderData) {
     
     // Try to create the folder on IMAP
     await client.mailboxCreate(valid.name);
+    invalidateFolderCache(client);
     
     // If IMAP creation succeeds, store in local database
     await prisma.folder.create({
@@ -125,6 +124,7 @@ export async function deleteFolder(id: string) {
     
     // Try to delete the folder on IMAP
     await client.mailboxDelete(folder.name);
+    invalidateFolderCache(client);
     
     // If IMAP deletion succeeds, remove from local database
     await prisma.folder.delete({
@@ -165,6 +165,7 @@ export async function updateFolder(id: string, data: Partial<FolderData>) {
       
       // Rename the folder on IMAP
       await client.mailboxRename(folder.name, data.name);
+      invalidateFolderCache(client);
       
       // Update local database
       await prisma.folder.update({

@@ -2,6 +2,7 @@
 
 import { ImapFlow } from "imapflow";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { cache } from "react";
 import { Mail, Folder } from "@/lib/types";
 import { APP_CONFIG } from "@/lib/config";
@@ -23,27 +24,177 @@ export const getImapClient = async () => {
   const session = cookieStore.get("mail-session");
 
   if (!session) {
-    throw new Error("No active session. Please log in.");
+    redirect("/login");
+  }
+  let sessionData: any;
+  try {
+    sessionData = JSON.parse(session.value);
+  } catch (e) {
+    redirect("/login");
   }
 
-  const { email, password } = JSON.parse(session.value);
+  if (
+    typeof sessionData?.email !== "string" ||
+    !sessionData.email.includes("@") ||
+    typeof sessionData?.password !== "string" ||
+    sessionData.password.length === 0
+  ) {
+    redirect("/login");
+  }
+
+  const { email, password } = sessionData;
   const domain = email.split("@")[1];
   const { host, port, secure, rejectUnauthorized } = APP_CONFIG.server.imap;
   const imapHost = host || `mail.${domain}`;
 
-  return new ImapFlow({
-    host: imapHost,
-    port: port,
-    secure: secure,
-    auth: {
-      user: email,
-      pass: password,
-    },
-    logger: false,
-    tls: {
-      rejectUnauthorized: rejectUnauthorized,
-    },
-  });
+  // Ensure global pool exists
+  const globalAny = global as any;
+  if (!globalAny.imapPool) {
+    globalAny.imapPool = new Map<string, { connections: { promise: Promise<ImapFlow>, lastUsed: number, inUse: boolean }[], nextIdx: number, waiters: Array<(client: ImapFlow) => void> }>();
+  }
+  const pool = globalAny.imapPool;
+
+  const connectionKey = `${email}:${imapHost}:${port}`;
+  let poolData = pool.get(connectionKey);
+
+  if (!poolData) {
+    poolData = { connections: [], nextIdx: 0, waiters: [] };
+    pool.set(connectionKey, poolData);
+  }
+
+  const MAX_CONNECTIONS = 3;
+
+  // Helper to release a connection back to the pool
+  const releaseConnection = (entry: any) => {
+    entry.inUse = false;
+    // Check if there's a waiter that can use this connection
+    if (poolData.waiters.length > 0) {
+      const waiter = poolData.waiters.shift();
+      if (waiter) {
+        entry.inUse = true;
+        entry.lastUsed = Date.now();
+        entry.promise.then((client: ImapFlow) => {
+          // Re-override logout/close for the new user
+          client.logout = async () => { releaseConnection(entry); };
+          client.close = () => { releaseConnection(entry); };
+          waiter(client);
+        }).catch(() => {
+          // If the connection is dead, let the waiter retry
+          poolData.connections = poolData.connections.filter((e: any) => e !== entry);
+          // Recursively satisfy the waiter
+          getImapClient().then(waiter).catch(() => {});
+        });
+      }
+    }
+  };
+
+  // Try to find a usable connection from the pool using round-robin
+  for (let i = 0; i < poolData.connections.length; i++) {
+    const idx = (poolData.nextIdx + i) % poolData.connections.length;
+    const entry = poolData.connections[idx];
+    if (!entry || entry.inUse) continue;
+
+    try {
+      const client = await entry.promise;
+      if (client.usable) {
+        poolData.nextIdx = (idx + 1) % poolData.connections.length;
+        entry.lastUsed = Date.now();
+        entry.inUse = true;
+
+        client.logout = async () => { releaseConnection(entry); };
+        client.close = () => { releaseConnection(entry); };
+
+        return client;
+      }
+    } catch (e) {
+      // Connection failed, mark to be filtered out
+    }
+    poolData.connections[idx] = null as any;
+  }
+
+  // Filter out any dead connections
+  poolData.connections = poolData.connections.filter(Boolean);
+
+  // If we're at max connections and no idle connection available, enqueue the request
+  if (poolData.connections.length >= MAX_CONNECTIONS) {
+    // Try to evict an idle connection first
+    const evictIdx = poolData.connections.findIndex((e: any) => !e.inUse);
+    if (evictIdx !== -1) {
+      const oldest = poolData.connections.splice(evictIdx, 1)[0];
+      oldest.promise.then((c: any) => c.realLogout?.()).catch(() => {});
+    } else {
+      // No idle connection to evict, must wait
+      return new Promise<ImapFlow>((resolve) => {
+        poolData.waiters.push(resolve);
+      });
+    }
+  }
+
+  // Create a new connection (client is not connected yet)
+  const entry: any = { promise: null, lastUsed: Date.now(), inUse: true };
+
+  const connectPromise = (async () => {
+    const client = new ImapFlow({
+      host: imapHost,
+      port: port,
+      secure: secure,
+      auth: {
+        user: email,
+        pass: password,
+      },
+      logger: false,
+      tls: {
+        rejectUnauthorized: rejectUnauthorized,
+      },
+    });
+
+    const originalLogout = client.logout.bind(client);
+    const originalConnect = client.connect.bind(client);
+    client.logout = async () => { releaseConnection(entry); };
+    client.close = () => { releaseConnection(entry); };
+    (client as any).realLogout = originalLogout;
+    (client as any).realConnect = originalConnect;
+
+    let hasConnected = false;
+    let connectTask: Promise<any> | null = null;
+    client.connect = async () => {
+      if (hasConnected && connectTask) return connectTask;
+      hasConnected = true;
+      connectTask = originalConnect();
+      return connectTask;
+    };
+
+    return client;
+  })();
+
+  entry.promise = connectPromise;
+  poolData.connections.push(entry);
+
+  // Clean up idle connections periodically (e.g., every 5 minutes)
+  if (!globalAny.imapPoolInterval) {
+    globalAny.imapPoolInterval = setInterval(() => {
+      const now = Date.now();
+      for (const [key, pd] of pool.entries()) {
+        pd.connections = pd.connections.filter((entry: any) => {
+          if (!entry.inUse && now - entry.lastUsed > 5 * 60 * 1000) {
+            entry.promise.then((c: any) => {
+              try {
+                if (typeof c.realLogout === 'function') c.realLogout();
+                else c.logout();
+              } catch (e) {}
+            }).catch(() => {});
+            return false;
+          }
+          return true;
+        });
+        if (pd.connections.length === 0) {
+          pool.delete(key);
+        }
+      }
+    }, 60 * 1000);
+  }
+
+  return connectPromise;
 };
 
 export const getMailDetailsAction = async (
@@ -60,38 +211,85 @@ export const getMailDetailsAction = async (
     const lock = await client.getMailboxLock(targetFolder);
 
     try {
-      const message = await client.fetchOne(
+      const structureMessage = await client.fetchOne(
         uid,
-        { source: true, bodyStructure: true },
+        { bodyStructure: true },
         { uid: true },
       );
 
-      if (message) {
-        if (message.source) {
-          const parsed = await simpleParser(message.source);
-          content = parsed.html || parsed.textAsHtml || parsed.text || "";
-        }
+      if (structureMessage && structureMessage.bodyStructure) {
+        let htmlPart: any = null;
+        let textPart: any = null;
 
-        const findAttachments = (part: any) => {
+        const findParts = (part: any) => {
           if (
             part.disposition?.toLowerCase() === "attachment" ||
             part.parameters?.name ||
             part.parameters?.filename
           ) {
             attachments.push({
-              id: part.part,
+              id: part.part || part.id,
               filename:
                 part.parameters?.filename || part.parameters?.name || "unnamed",
-              contentType: part.contentType,
+              contentType:
+                part.contentType || part.type || "application/octet-stream",
               size: part.size,
-              contentId: part.contentId,
+              contentId: part.contentId || part.id,
             });
+          } else {
+            const type = (part.contentType || part.type || "").toLowerCase();
+            if (type === "text/html" && !htmlPart) htmlPart = part;
+            if (type === "text/plain" && !textPart) textPart = part;
           }
           if (part.childNodes) {
-            part.childNodes.forEach(findAttachments);
+            part.childNodes.forEach(findParts);
           }
         };
-        if (message.bodyStructure) findAttachments(message.bodyStructure);
+
+        findParts(structureMessage.bodyStructure);
+
+        const targetPart = htmlPart || textPart;
+        const partId =
+          targetPart?.part ||
+          ((structureMessage.bodyStructure.contentType ||
+            structureMessage.bodyStructure.type ||
+            "")
+            .toLowerCase()
+            .startsWith("text/")
+            ? "1"
+            : null);
+
+        if (targetPart && partId) {
+          // Fetch ONLY the text part to skip heavy attachments
+          const partMessage = await client.fetchOne(
+            uid,
+            { bodyParts: [partId] },
+            { uid: true }
+          );
+
+          if (partMessage && partMessage.bodyParts) {
+            const rawContent = partMessage.bodyParts.get(partId);
+            if (rawContent) {
+              const charset = targetPart.parameters?.charset || "utf-8";
+              const encoding = targetPart.encoding || "7bit";
+              const fakeHeader = `Content-Type: ${targetPart.contentType || targetPart.type || "text/plain"}; charset="${charset}"\r\nContent-Transfer-Encoding: ${encoding}\r\n\r\n`;
+              const fakeSource = Buffer.concat([
+                Buffer.from(fakeHeader),
+                rawContent,
+              ]);
+
+              const parsed = await simpleParser(fakeSource);
+              content = parsed.html || parsed.textAsHtml || parsed.text || "";
+            }
+          }
+        } else {
+           // Fallback to fetching full source if no clear text part is found
+           const message = await client.fetchOne(uid, { source: true }, { uid: true });
+           if (message && message.source) {
+              const parsed = await simpleParser(message.source);
+              content = parsed.html || parsed.textAsHtml || parsed.text || "";
+           }
+        }
       }
     } finally {
       lock.release();
@@ -180,12 +378,34 @@ export const downloadAttachmentAction = async (
   return null;
 };
 
+export const invalidateFolderCache = async (client: any) => {
+  client._folderCache = null;
+  const globalAny = global as any;
+  if (globalAny.imapPool) {
+    for (const poolData of globalAny.imapPool.values()) {
+      for (const entry of poolData.connections) {
+        if (entry) {
+          entry.promise.then((c: any) => { if (c) c._folderCache = null; }).catch(() => {});
+        }
+      }
+    }
+  }
+};
+
 export const resolveFolder = async (client: ImapFlow, slug: string) => {
   const normalizedSlug = slug.toLowerCase();
 
   if (normalizedSlug === "inbox") return "INBOX";
 
-  const folders = await client.list();
+  if (!(client as any)._folderCache) {
+    (client as any)._folderCache = await client.list();
+    // Invalidate cache after 5 minutes
+    setTimeout(() => {
+      invalidateFolderCache(client);
+    }, 5 * 60 * 1000);
+  }
+  
+  const folders = (client as any)._folderCache;
 
   const specialUseMap: Record<string, string> = {
     sent: "\\Sent",
@@ -198,19 +418,19 @@ export const resolveFolder = async (client: ImapFlow, slug: string) => {
 
   const targetAttribute = specialUseMap[normalizedSlug];
   if (targetAttribute) {
-    const found = folders.find((f) => f.specialUse === targetAttribute);
+    const found = folders.find((f: any) => f.specialUse === targetAttribute);
     if (found) return found.path;
   }
 
   const foundByDirectName = folders.find(
-    (f) =>
+    (f: any) =>
       f.name.toLowerCase() === normalizedSlug ||
       f.path.toLowerCase() === normalizedSlug,
   );
   if (foundByDirectName) return foundByDirectName.path;
 
   const foundByKeyword = folders.find(
-    (f) =>
+    (f: any) =>
       f.name.toLowerCase().includes(normalizedSlug) ||
       f.path.toLowerCase().includes(normalizedSlug),
   );
@@ -250,8 +470,8 @@ const getMails = async (
           range = [];
         }
       } else {
-        const status = await client.status(targetFolder, { messages: true });
-        const total = status.messages || 0;
+        // Read total from already selected mailbox state to avoid network round-trip
+        const total = client.mailbox?.exists || 0;
         if (total > 0) {
           const start = Math.max(1, total - 49);
           range = `${start}:*`;
@@ -265,25 +485,11 @@ const getMails = async (
             envelope: true,
             flags: true,
             uid: true,
-            bodyStructure: true,
           },
           { uid: Array.isArray(range) },
         )) {
           if (message.envelope && message.uid) {
-            // Check for attachments in bodyStructure
-            let hasAttachments = false;
-            if (message.bodyStructure) {
-              const checkPart = (part: any) => {
-                if (part.disposition === "attachment") {
-                  hasAttachments = true;
-                  return;
-                }
-                if (part.childNodes) {
-                  part.childNodes.forEach(checkPart);
-                }
-              };
-              checkPart(message.bodyStructure);
-            }
+            const hasAttachments = false;
 
             const cleanName = (name?: string) => {
               if (!name) return "";
@@ -298,15 +504,15 @@ const getMails = async (
               },
               subject: message.envelope.subject || "(No Subject)",
               to:
-                message.envelope.to?.map((t) => ({
+                message.envelope.to?.map((t: any) => ({
                   name: cleanName(t.name),
                   address: t.address || "",
                 })) || [],
-              cc: message.envelope.cc?.map((t) => ({
+              cc: message.envelope.cc?.map((t: any) => ({
                 name: cleanName(t.name),
                 address: t.address || "",
               })),
-              bcc: message.envelope.bcc?.map((t) => ({
+              bcc: message.envelope.bcc?.map((t: any) => ({
                 name: cleanName(t.name),
                 address: t.address || "",
               })),
@@ -346,10 +552,14 @@ const getFolders = async (): Promise<Folder[]> => {
   const client = await getImapClient();
   try {
     await client.connect();
-    // List all folders first
-    const mailboxes = await client.list();
+    if (!(client as any)._folderCache) {
+      (client as any)._folderCache = await client.list();
+      setTimeout(() => {
+        (client as any)._folderCache = null;
+      }, 5 * 60 * 1000);
+    }
+    const mailboxes = (client as any)._folderCache;
 
-    const folders: Folder[] = [];
     const reverseSpecialUseMap: Record<string, string> = {
       "\\Inbox": "inbox",
       "\\Sent": "sent",
@@ -360,12 +570,12 @@ const getFolders = async (): Promise<Folder[]> => {
       "\\Flagged": "starred",
     };
 
-    for (const mailbox of mailboxes) {
+    const folderPromises = mailboxes.map(async (mailbox: any) => {
       if (
         mailbox.flags.has("\\Noselect") &&
         !mailbox.flags.has("\\HasChildren")
       )
-        continue;
+        return null;
 
       try {
         let status = null;
@@ -397,17 +607,20 @@ const getFolders = async (): Promise<Folder[]> => {
           slug = "junk";
         }
 
-        folders.push({
+        return {
           id: mailbox.path,
           name: mailbox.name || mailbox.path,
           slug,
           unreadCount: status?.unseen || 0,
           totalCount: status?.messages || 0,
-        });
+        };
       } catch {
-        // Skip inaccessible folders
+        return null; // Skip inaccessible folders
       }
-    }
+    });
+
+    const results = await Promise.all(folderPromises);
+    const folders: Folder[] = results.filter(Boolean) as Folder[];
 
     const order = [
       "inbox",
@@ -506,7 +719,7 @@ export const archiveMailAction = async (folderId: string, uid: string) => {
       // Check if we need to create the folder
       const folders = await client.list();
       const archiveExists = folders.some(
-        (f) =>
+        (f: any) =>
           f.name.toLowerCase() === "archive" || f.specialUse === "\\Archive",
       );
 
@@ -514,11 +727,13 @@ export const archiveMailAction = async (folderId: string, uid: string) => {
         // Create the Archive folder
         try {
           await client.mailboxCreate("Archive");
+          invalidateFolderCache(client);
           targetFolder = "Archive";
         } catch (_createErr) {
           // If creation fails, try INBOX.Archive for some servers
           try {
             await client.mailboxCreate("INBOX.Archive");
+            invalidateFolderCache(client);
             targetFolder = "INBOX.Archive";
           } catch {
             return {
