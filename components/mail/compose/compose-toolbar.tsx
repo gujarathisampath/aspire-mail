@@ -15,6 +15,7 @@ import {
   Loader2Icon,
   Trash2Icon,
   PaperclipIcon,
+  PenLineIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -32,6 +33,7 @@ interface Props {
   onDiscard: () => void;
   onLink: () => void;
   onAttach: () => void;
+  onSignature: () => void;
   isSending: boolean;
 }
 
@@ -41,6 +43,7 @@ const ComposeToolbar = ({
   onDiscard,
   onLink,
   onAttach,
+  onSignature,
   isSending,
 }: Props) => {
   // Mechanism to force update when editor state changes
@@ -104,6 +107,21 @@ const ComposeToolbar = ({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Attach File</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    type="button"
+                    onClick={onSignature}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <PenLineIcon className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Insert Signature</TooltipContent>
               </Tooltip>
 
               <Separator orientation="vertical" className="h-6 mx-1" />

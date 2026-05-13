@@ -2,14 +2,17 @@
 
 import { useEffect } from "react";
 import { useParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { Mail } from "@/lib/types";
 import { useMailActions } from "@/hooks/use-mail-actions";
+import { getMailDetailsAction } from "@/lib/actions/mail";
 
 import { MailDisplayToolbar } from "./display/mail-toolbar";
 import { MailDisplayHeader } from "./display/mail-header";
 import { MailDisplayContent } from "./display/mail-content";
 import { MailReplyFooter } from "./display/mail-reply-footer";
 import { MailDisplayEmpty } from "./display/mail-empty";
+import MailDisplaySkeleton from "./display/mail-display-skeleton";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 interface Props {
@@ -21,6 +24,13 @@ const MailDisplay = ({ mail, currentUserEmail }: Props) => {
   const params = useParams();
   const rawFolder = (params.folder as string) || "INBOX";
   const folderId = decodeURIComponent(rawFolder);
+
+  const { data: details, isLoading } = useQuery({
+    queryKey: ["mail-details", folderId, mail?.id, currentUserEmail],
+    queryFn: () => getMailDetailsAction(folderId, mail!.id),
+    enabled: !!mail,
+    staleTime: 30 * 60 * 1000,
+  });
 
   const { toggleReadMutation } = useMailActions({ mail, folderId, currentUserEmail });
 
@@ -35,6 +45,10 @@ const MailDisplay = ({ mail, currentUserEmail }: Props) => {
     return <MailDisplayEmpty />;
   }
 
+  if (isLoading && !details) {
+    return <MailDisplaySkeleton />;
+  }
+
   return (
     <TooltipProvider delayDuration={0}>
       <div className="flex h-full flex-col bg-background">
@@ -47,7 +61,13 @@ const MailDisplay = ({ mail, currentUserEmail }: Props) => {
 
         <div className="flex-1 overflow-y-auto">
           <MailDisplayHeader mail={mail} currentUserEmail={currentUserEmail} />
-          <MailDisplayContent mail={mail} folderId={folderId} currentUserEmail={currentUserEmail} />
+          <MailDisplayContent
+            mail={mail}
+            folderId={folderId}
+            currentUserEmail={currentUserEmail}
+            content={details?.content}
+            attachments={details?.attachments}
+          />
         </div>
 
         <MailReplyFooter mail={mail} folderId={folderId} />

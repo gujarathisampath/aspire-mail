@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Editor } from "@tiptap/react";
 import { ArrowLeftIcon, FileIcon, XIcon, SaveIcon } from "lucide-react";
 
@@ -49,7 +49,6 @@ const ComposePage = () => {
     },
   });
   const { handleSubmit, reset, watch, getValues } = methods;
-  // eslint-disable-next-line react-hooks/incompatible-library
   const subject = watch("subject");
 
   useEffect(() => {
@@ -59,6 +58,15 @@ const ComposePage = () => {
   }, [editor, initialContent]);
 
   const queryClient = useQueryClient();
+
+  const { data: defaultIdentity } = useQuery({
+    queryKey: ["default-identity"],
+    queryFn: async () => {
+      // dynamic import to avoid module issues if needed, or just normal import
+      const { getDefaultIdentity } = await import("@/lib/actions/user-settings");
+      return getDefaultIdentity();
+    },
+  });
 
   const saveDraftMutation = useMutation({
     mutationFn: saveDraftAction,
@@ -72,6 +80,17 @@ const ComposePage = () => {
       }
     },
   });
+
+  const handleInsertSignature = useCallback(() => {
+    if (!editor) return;
+    if (defaultIdentity?.signature) {
+      const formattedSignature = `<br/><br/><div class="signature" style="color: #666;">${defaultIdentity.signature.replace(/\n/g, '<br/>')}</div>`;
+      editor.chain().focus().insertContent(formattedSignature).run();
+      toast.success("Signature added");
+    } else {
+      toast.error("No signature found in your default identity.");
+    }
+  }, [editor, defaultIdentity]);
 
   const onSubmit = (data: SendMailFormData) => {
     const promise = async () => {
@@ -274,6 +293,7 @@ const ComposePage = () => {
           onDiscard={handleDiscard}
           onLink={() => setLinkDialogOpen(true)}
           onAttach={handleAttachClick}
+          onSignature={handleInsertSignature}
           isSending={false}
         />
 
