@@ -62,7 +62,6 @@ const ComposePage = () => {
   const { data: defaultIdentity } = useQuery({
     queryKey: ["default-identity"],
     queryFn: async () => {
-      // dynamic import to avoid module issues if needed, or just normal import
       const { getDefaultIdentity } = await import("@/lib/actions/user-settings");
       return getDefaultIdentity();
     },

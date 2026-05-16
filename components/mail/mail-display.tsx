@@ -12,8 +12,8 @@ import { MailDisplayHeader } from "./display/mail-header";
 import { MailDisplayContent } from "./display/mail-content";
 import { MailReplyFooter } from "./display/mail-reply-footer";
 import { MailDisplayEmpty } from "./display/mail-empty";
-import MailDisplaySkeleton from "./display/mail-display-skeleton";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Loader2Icon } from "lucide-react";
 
 interface Props {
   mail: Mail | null;
@@ -48,7 +48,14 @@ const MailDisplay = ({ mail, currentUserEmail }: Props) => {
   }
 
   if (isPending) {
-    return <MailDisplaySkeleton />;
+    return (
+      <div className="flex h-full w-full items-center justify-center p-8 text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <Loader2Icon className="h-5 w-5 animate-spin text-primary" />
+          <span>Loading message...</span>
+        </div>
+      </div>
+    );
   }
 
   return (
